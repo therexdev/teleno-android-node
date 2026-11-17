@@ -1,0 +1,13 @@
+--- a/cmake/modules/hunter_dump_cmake_flags.cmake
++++ b/cmake/modules/hunter_dump_cmake_flags.cmake
+@@ -102,7 +102,9 @@
+     endif()
+ 
+     foreach(x ${CMAKE_CXX_IMPLICIT_LINK_LIBRARIES})
+-      if(EXISTS "${x}")
++      # Modern Android NDK/CMake may report GNU exact-name linker flags.
++      # They already include -l; prepending it produces -l-l:libunwind.a.
++      if(EXISTS "${x}" OR x MATCHES "^-l:")
+         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${x}")
+       else()
+         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -l${x}")

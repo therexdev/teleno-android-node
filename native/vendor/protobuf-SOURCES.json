@@ -1,0 +1,15 @@
+{
+  "upstream": "https://github.com/koinos/protobuf/archive/e1b1477875a8b022903b548eb144f2c7bf4d9561.tar.gz",
+  "upstreamSha1": "5796707a98eec15ffb3ad86ff50e8eec5fa65e68",
+  "upstreamSha256": "824eca40d5a9b7e1090961e84efe7b90fba818156c32d92e447f7daf61522318",
+  "patchedArchiveSha1": "fb1e1766ddf661a3a2c5fc2d2b23b62ce7866340",
+  "patchedArchiveSha256": "76afbfc437130fe528916824c4a5263ad3e5831f5a677a4a41ff53247ec71e93",
+  "patch": "native/patches/protobuf-android-build.patch",
+  "patchSha256": "6025fab1261d1bb308defdbeae39e0e676b2c72aab1f3b57f96e42a34bb5fd44",
+  "sourceFileCount": 2421,
+  "changedFiles": [
+    "cmake/libprotobuf-lite.cmake",
+    "cmake/libprotobuf.cmake",
+    "cmake/protobuf-config.cmake.in"
+  ]
+}

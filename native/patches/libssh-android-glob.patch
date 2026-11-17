@@ -1,0 +1,31 @@
+--- a/src/config.c
++++ b/src/config.c
+@@ -276,7 +276,7 @@
+     return;
+ }
+ 
+-#if defined(HAVE_GLOB) && defined(HAVE_GLOB_GL_FLAGS_MEMBER)
++#if defined(HAVE_GLOB) && defined(HAVE_GLOB_GL_FLAGS_MEMBER) && defined(GLOB_TILDE)
+ static void local_parse_glob(ssh_session session,
+                              const char *fileglob,
+                              int *parsing,
+@@ -931,7 +931,7 @@
+           SAFE_FREE(x);
+           return -1;
+         }
+-#if defined(HAVE_GLOB) && defined(HAVE_GLOB_GL_FLAGS_MEMBER)
++#if defined(HAVE_GLOB) && defined(HAVE_GLOB_GL_FLAGS_MEMBER) && defined(GLOB_TILDE)
+         local_parse_glob(session, path, parsing, depth + 1, global);
+ #else
+         local_parse_file(session, path, parsing, depth + 1, global);
+--- a/src/misc.c
++++ b/src/misc.c
+@@ -350,7 +350,7 @@
+         return 0;
+     }
+ 
+-    if (S_ISDIR(buffer.st_mode) && (buffer.st_mode & S_IWRITE)) {
++    if (S_ISDIR(buffer.st_mode) && (buffer.st_mode & S_IWUSR)) {
+         return 1;
+     }
+ 

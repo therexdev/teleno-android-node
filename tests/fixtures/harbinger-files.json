@@ -1,0 +1,457 @@
+{
+  "format": "teleno-native-snapshot-files",
+  "version": 1,
+  "backup_id": "20260617T215046Z-ms-1781733046440-files-72",
+  "files": [
+    {
+      "path": "chain/genesis_data.json",
+      "sha256": "8db10a2fc95a631c420fb3d0c56b43e44ba1cf5b2bfed3d42dfce2be545296bd",
+      "size_bytes": 17601,
+      "runtime_file": true
+    },
+    {
+      "path": "config.yml",
+      "sha256": "73d299b79f0017807c6056ba44695d9982cd7fac9ceebd0c93885b595af37917",
+      "size_bytes": 804,
+      "runtime_file": true
+    },
+    {
+      "path": "db/001898.sst",
+      "sha256": "eb0fd9463763693a376286af21c0be223d544b27e07a517af48631efb70a4086",
+      "size_bytes": 67166621,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001899.sst",
+      "sha256": "539090919b83861c4b9686ce4daa75adf6a42c891edd4b90e80db29fc6405f45",
+      "size_bytes": 67168607,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001900.sst",
+      "sha256": "15fd902d067965da5969faec7b95a06ad7aa808d17448df842577d63f5f4db63",
+      "size_bytes": 67165423,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001901.sst",
+      "sha256": "6973f3ae34bbe4da7c104d706fdefba9398855281ee2bd765a53e99c72c13530",
+      "size_bytes": 67162821,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001902.sst",
+      "sha256": "2b80c894cbfc6315a61f7dce9624490a6efef7bbe5c45bef11472d9fd4280b4b",
+      "size_bytes": 67166130,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001903.sst",
+      "sha256": "8437f7aa524ee7f9069eb96c2ab03f9bd8951d78b7ede943d8d4e9976b56ff07",
+      "size_bytes": 67172185,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001904.sst",
+      "sha256": "0eeb500ccd02e7bf85f3ac41851a7339daa8413e53e73eed7d77de75904f074e",
+      "size_bytes": 67161325,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001905.sst",
+      "sha256": "c3874e9330a2a794be6e5f8c3887328746b42c7cb2ed603777ef5f1f207aa3d0",
+      "size_bytes": 67158902,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001906.sst",
+      "sha256": "39465fd00078dce7bf38473564f70b776e99597b02c041587af6a43626f85073",
+      "size_bytes": 67166034,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001907.sst",
+      "sha256": "4cef45e4f636b8bd94555f747057a800ca3694a3cb02b01f76cd0384969c38ca",
+      "size_bytes": 67171461,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001908.sst",
+      "sha256": "497d97a9bf8b03db6bb6272d47b9424dc1059da72e4a66804a918cee44169596",
+      "size_bytes": 9220870,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001910.sst",
+      "sha256": "0a737482aa49def3065f47f4bfdec556c3bcd7fed6115bbe02efd906c1192ab2",
+      "size_bytes": 67167608,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001911.sst",
+      "sha256": "1b9dae660ae0d0ca6a65313b07680ddabbb6b877a973f27709a1d45dfa944211",
+      "size_bytes": 67163481,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001912.sst",
+      "sha256": "de06aa1ca9a64d612805e2aa986315520020cc9607d920380642a2185ff5b83a",
+      "size_bytes": 67160396,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001913.sst",
+      "sha256": "823353f9fc88f00e8ea35791442215fccc56d691f84f16917d2afb627b179439",
+      "size_bytes": 67165156,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001914.sst",
+      "sha256": "1e16e637f4bc0f97072eb16c58369a2bed022e86e3c7303be460bc0d1cc34c0c",
+      "size_bytes": 67161273,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001915.sst",
+      "sha256": "b3e6d090f6eaa6a2f3c2c0922c7df7d1fa93d35ee5ca1122d298c9ea9ac8fbeb",
+      "size_bytes": 67166858,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001916.sst",
+      "sha256": "94f6303daf8dae020ee48bfa0fa439cd770e96b1006b4d8e83de5549444a7af5",
+      "size_bytes": 67162698,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001917.sst",
+      "sha256": "fefabca4e9684865097d59627017a6f064d49fafed12890579b7a226c608d300",
+      "size_bytes": 49521868,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001918.sst",
+      "sha256": "62ff2c9a8d85c5686c8923f85a32cfebea0584d4d8eecd6b196f8647e343ccce",
+      "size_bytes": 67170686,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001920.sst",
+      "sha256": "6e82ceea763f89080ef548761b930d11f0d9e48fd96cb437a6b91057034dd094",
+      "size_bytes": 67169565,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001921.sst",
+      "sha256": "6e0909d97b3f4f56dc1d600dfdb7ff25a0c0f5fa6c636652042fcb2cda6a5ba5",
+      "size_bytes": 67172704,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001922.sst",
+      "sha256": "9375d5f2c4859ff19c888812fde9d563aa453375f6816339fa273f3a714d19c7",
+      "size_bytes": 67168006,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001923.sst",
+      "sha256": "79a1045a59e1b23c5ada994f3bf356fbd40332cd3809aa8cfb5c4443dead513e",
+      "size_bytes": 67169279,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001924.sst",
+      "sha256": "85cc7e6e3c0389e3d574d17c9bb0f7e726b6cf52f24652edeca224b4dc0ffc6a",
+      "size_bytes": 67171608,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001925.sst",
+      "sha256": "07238bc4f200b41aa7651d53c2f1201dbd0ad010e485424878d4ad8afce8f73d",
+      "size_bytes": 67172349,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001926.sst",
+      "sha256": "7752a581467846b9346236b3d2616a2f9985e3f2edba5b3db6e8a722f28a5b58",
+      "size_bytes": 67158158,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001927.sst",
+      "sha256": "f55a7fdb9acbcc7e29c1a00b27c0800265ea753043136daeb340f29fe1b950d9",
+      "size_bytes": 56863043,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001928.sst",
+      "sha256": "73731d598637223922816121cd511705efd88f18449689b74bb8e2f34876b77d",
+      "size_bytes": 17473570,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001929.sst",
+      "sha256": "d11ac43abf8b6507b89559cc0d755b1e36f23a9d1417ec937b5214f53b966036",
+      "size_bytes": 67158678,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001930.sst",
+      "sha256": "ad0525894aa8d3f4dcbf0f2dc030aa35602c0d2d0bb741325d667f460a65d11d",
+      "size_bytes": 67167232,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001931.sst",
+      "sha256": "dbfbe7b5c05f7450d78493c2ce151ce6324443de41e419d5657b3b190822c946",
+      "size_bytes": 67163828,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001932.sst",
+      "sha256": "183984890fd54c6955f36f9d94db7218f2fef43a4d9e7fe644da647909ae61cf",
+      "size_bytes": 67156308,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001933.sst",
+      "sha256": "5e2ba20bb0bb58c12627d04a7437f2b8b7cf31801b70a2978fc3b773c171a46a",
+      "size_bytes": 67164717,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001934.sst",
+      "sha256": "ad73cba0549d68a1e2d329c28a0fff7bf169991b11c8af55ff61b45d2a1f02ca",
+      "size_bytes": 67164470,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001935.sst",
+      "sha256": "e1b6195789477bf33cdc8554c4b9fe4b41d2b61b0ffc89aef95421449911c8a2",
+      "size_bytes": 67161360,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001936.sst",
+      "sha256": "abbdad70720143e6f073f338285c528488a1904ff5660f7ded30efbba0ab3905",
+      "size_bytes": 67161575,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001937.sst",
+      "sha256": "5068fb2dc5dd72070757ab248998d38b9204c081c9e980eba74b7dab2741463b",
+      "size_bytes": 56269379,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001938.sst",
+      "sha256": "01edb290cd4c1b20f9e4b2a003a25d1735565be8e0d7b8c0eb9de620d3c6de8a",
+      "size_bytes": 67160680,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001939.sst",
+      "sha256": "158f403556541a36819e633378f96a349864677301a0c9ffd3f854799a87645c",
+      "size_bytes": 18659368,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001940.sst",
+      "sha256": "f803f1347614c8f3b23e714bd6578b4a3b6e31e4f6def50418e8c783f06ad241",
+      "size_bytes": 67166085,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001941.sst",
+      "sha256": "6f147458ef25a8002b961909becc5590efb1c7250a01b1d774e8ce6c30dd5dd0",
+      "size_bytes": 67158228,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001942.sst",
+      "sha256": "8ad2937c781d9975a7631e072c40841d4361de86bb09e230f37cb1912cdec92e",
+      "size_bytes": 67171807,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001943.sst",
+      "sha256": "3ad841eee045fa9307df39e523ec634a465cfdec4ee895b4bb139b85430d4054",
+      "size_bytes": 67155903,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001944.sst",
+      "sha256": "c558063b31a59f5f69a8b1b5f4356efc7c8ea8bbb22beea9204314bd5433a0ab",
+      "size_bytes": 67155502,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001945.sst",
+      "sha256": "0c61c2f29b8543827c418badee9e74f560df1de94fd8ad7b56382016ce173af8",
+      "size_bytes": 67169624,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001946.sst",
+      "sha256": "254b0d17727dc4ca31c015e61688c3fee2e2d1f486d666b4b6591de58b05fb1f",
+      "size_bytes": 67159157,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001947.sst",
+      "sha256": "f48abd5c3898df729c8e4f2e2e36d9f9b894f38f8dc717d0cf5e2719ca18f57d",
+      "size_bytes": 67162572,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001948.sst",
+      "sha256": "6927e7773b444b25d71e47584620d632c691eb37413adbefb0fa96dd871d6971",
+      "size_bytes": 13818901,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001949.sst",
+      "sha256": "f42b6a61dfa9927acf5e86a9b1d79bf35d9c93bb925030c8d581b7b05e55eba5",
+      "size_bytes": 550469,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001951.sst",
+      "sha256": "2a7d3e3958b909b544bcc462c4d1a77f83516c41c86f4810d62891db08f39853",
+      "size_bytes": 1386,
+      "runtime_file": false
+    },
+    {
+      "path": "db/001952.sst",
+      "sha256": "c05adb851bf8c1b2d67cf00cac749b21c52e154486f78d7b752e4d37de3bf580",
+      "size_bytes": 1693449,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002176.sst",
+      "sha256": "dc6501b88e2329c06918cc75b7f03f651e068b436c3125eb78410c357eab2b00",
+      "size_bytes": 136995,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002193.sst",
+      "sha256": "4cb24007063ccfeb44a763a0de4675cec924b8c7073b23a59d7495afcd6e3500",
+      "size_bytes": 2162,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002224.sst",
+      "sha256": "e2df3a83c190a0f23a049bdc2d1d8ae5c4be990501fc0a93780524d2de7a4e70",
+      "size_bytes": 1480,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002236.sst",
+      "sha256": "2b337968a58ebc14632cf13a915c9b45e26d41820dce838b139188c4eb4c5367",
+      "size_bytes": 1324,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002246.sst",
+      "sha256": "af1caaad72f7e5d945557d1b267a77f6f4e08d90b924408244d445a28851c6c6",
+      "size_bytes": 5315,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002247.sst",
+      "sha256": "8bdc6c069b54e647c57b356917fd8efcc2421d37b4bed8edc94b87ed450cbc0e",
+      "size_bytes": 36215631,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002250.sst",
+      "sha256": "69140681bddb780523bb8f580c4cc4a03772768b26b1eca0a1136963a02368d6",
+      "size_bytes": 1324,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002251.sst",
+      "sha256": "fc04fa09bdd84612e3cc83441e1aefb4a941269a65095de5e3d3b4fc20707387",
+      "size_bytes": 31382995,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002255.sst",
+      "sha256": "2f20bfa165f5818a3c3bd62a8dca96bcfbe56a7fbdaf740a2792f5c5a57e65f5",
+      "size_bytes": 555868,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002258.sst",
+      "sha256": "b75d0f4c1c9cf4e6fb669e2fc6a3a979cb6029acaee08d99906f914a4f105fe8",
+      "size_bytes": 23116,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002264.sst",
+      "sha256": "c51a0f50d257b7bbb104d67546bba3d222fdbbcd88c0fff5323c91f711227f50",
+      "size_bytes": 1378,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002265.log",
+      "sha256": "f9028342eaa18ac9b66bfbdb8fc72d8be24a9f7beafe5d49325c8e5c6281e6e6",
+      "size_bytes": 3375,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002266.sst",
+      "sha256": "a68aeaba2b3f382a289bfea995ef05bd50566056d01939481a6fa81bd56ac868",
+      "size_bytes": 23493,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002268.sst",
+      "sha256": "32491284ae453841f26a41200f4bf8cd12fce53c7f445b3ab7f3fa7a1751d4cd",
+      "size_bytes": 2024,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002269.sst",
+      "sha256": "b6f9afc398361ae12ab1e8147377c0ec41100dad7ae43c380c4b033fa95c0aff",
+      "size_bytes": 1131,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002270.sst",
+      "sha256": "bebbfe544e9756b685bea9b23933cbbbc27999e12be07863d9e369144c0b648d",
+      "size_bytes": 1503,
+      "runtime_file": false
+    },
+    {
+      "path": "db/002271.sst",
+      "sha256": "3295c3ee3a5f980c08b5e89ed8c8a2380fd76ebfcbf863cb2a2de1480e7e551d",
+      "size_bytes": 1324,
+      "runtime_file": false
+    },
+    {
+      "path": "db/CURRENT",
+      "sha256": "36d014eeb0cc8dacaca2527171cebe34b7f474bdc60c18d912819fcce00e0b27",
+      "size_bytes": 16,
+      "runtime_file": false
+    },
+    {
+      "path": "db/MANIFEST-002261",
+      "sha256": "e0d303b5587a90883297b8018987acb535b88b5b0f0b1f7a603e58bcc9f464a3",
+      "size_bytes": 11861,
+      "runtime_file": false
+    },
+    {
+      "path": "db/OPTIONS-002263",
+      "sha256": "1fecca86e52ffb21cfed6991868d7ffedb91f1af4be716da2d21e4dcaf11629c",
+      "size_bytes": 43316,
+      "runtime_file": false
+    },
+    {
+      "path": "jsonrpc/descriptors/koinos_descriptors.pb",
+      "sha256": "2f46b9820fac191d4cc6202902b658c9bed33880318b4a18ae35c8e2e899fa16",
+      "size_bytes": 40114,
+      "runtime_file": true
+    }
+  ]
+}

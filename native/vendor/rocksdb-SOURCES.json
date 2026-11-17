@@ -1,0 +1,13 @@
+{
+  "upstream": "https://github.com/facebook/rocksdb/archive/v8.8.1.tar.gz",
+  "upstreamSha1": "ef3e82eb750013c9fec5220911213609613776d7",
+  "upstreamSha256": "056c7e21ad8ae36b026ac3b94b9d6e0fcc60e1d937fc80330921e4181be5c36e",
+  "patchedArchiveSha1": "18c4a475348a7a22936905080edb07dcdc497de7",
+  "patchedArchiveSha256": "203ff663eef018a3c9cda5670cab89edf97966f36c2499786b072457d4d05002",
+  "patch": "native/patches/rocksdb-android-build.patch",
+  "patchSha256": "33cea419ddce519f73223e5a739b998b87ac453530eb305969c1e1aa86b54580",
+  "sourceFileCount": 1988,
+  "changedFiles": [
+    "env/io_posix.cc"
+  ]
+}

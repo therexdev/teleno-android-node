@@ -1,0 +1,10 @@
+--- a/scripts/build-gmp-static.sh
++++ b/scripts/build-gmp-static.sh
+@@ -116,6 +116,7 @@
+   cd "$GMP_BUILD_DIR"
+   env "${CONFIGURE_ENV[@]}" "$GMP_EXTRACTED_SOURCE_DIR/configure" \
+     --prefix="$GMP_INSTALL_DIR" \
++    --host=aarch64-linux-android \
+     --disable-shared \
+     --enable-static \
+     --with-pic

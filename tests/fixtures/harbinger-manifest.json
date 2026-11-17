@@ -1,0 +1,46 @@
+{
+  "format": "teleno-native-rocksdb-snapshot",
+  "version": 1,
+  "backup_id": "20260617T215046Z-ms-1781733046440-files-72",
+  "created_at": "20260617T215056Z",
+  "node": {
+    "name": "teleno_node",
+    "version": "0.1.0+a4541257940e-dirty"
+  },
+  "source": {
+    "node_id": "public-bootstrap-testnet",
+    "storage_layout": "unified",
+    "network": "testnet"
+  },
+  "repository": {
+    "type": "public-bootstrap-object-store",
+    "base_url": "https://testnet.koinosfoundation.org/backups/testnet/teleno-bootstrap"
+  },
+  "snapshot": {
+    "file_count": 75,
+    "object_count": 75,
+    "total_bytes": 3113463513
+  },
+  "sizes": {
+    "restored_database_bytes": 3113404994,
+    "runtime_files_bytes": 58519,
+    "object_download_bytes": 3113463513,
+    "archive_bytes": 0,
+    "minimum_target_free_bytes": 3247681241,
+    "recommended_target_free_bytes": 13985099481
+  },
+  "restore": {
+    "requires_node_stop": true,
+    "start_as_observer_first": true,
+    "force_block_producer_disabled_on_first_start": true
+  },
+  "public_bootstrap": {
+    "version": 1,
+    "network": "testnet",
+    "source_backup_id": "20260617T215046Z-ms-1781733046440-files-72",
+    "public_base_url": "https://testnet.koinosfoundation.org/backups/testnet/teleno-bootstrap",
+    "promoted_at": "20260620T034236Z",
+    "producer_mode": false,
+    "sanitized_config": true
+  }
+}

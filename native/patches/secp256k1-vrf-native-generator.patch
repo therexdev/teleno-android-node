@@ -1,0 +1,15 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -137,7 +137,11 @@
+ 
+ 	include(NativeExecutable)
+ 	add_native_executable(gen_context src/gen_context.c)
+-	target_compile_definitions(gen_context PRIVATE HAVE_CONFIG_H)
++	# Cross builds expose gen_context as an imported host executable.
++	# Its native sub-build applies this definition to the actual compiled target.
++	if(NOT CMAKE_CROSSCOMPILING)
++		target_compile_definitions(gen_context PRIVATE HAVE_CONFIG_H)
++	endif()
+ 
+     add_custom_command(
+         OUTPUT ecmult_static_context.h.stamp

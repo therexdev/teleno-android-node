@@ -1,0 +1,10 @@
+{
+  "upstream": "https://github.com/koinos/secp256k1-vrf/archive/db479e83be5685f652a9bafefaef77246fdf3bbe.tar.gz",
+  "upstreamSha1": "62df75e061c4afd6f0548f1e8267cc3da6abee15",
+  "upstreamSha256": "1ac6e82c5eb3bd9dbe4e149cb37e0747558b72e5ba2728314c62e2b079f28911",
+  "patch": "native/patches/secp256k1-vrf-native-generator.patch",
+  "patchSha256": "bdd1038779720cd1bab7ed21014263e10a2e8d7a82a53626d6ce4ca390316a9a",
+  "patchedArchiveSha1": "23f9075e566fc5ff60a3afc0ab34ebe3a2eafdc7",
+  "patchedArchiveSha256": "8f5e3c486152d57c13c8e483358d77725efef56fcc9091b33c37deaffb87ec66",
+  "scope": "Only CMake imported host-generator target handling; cryptography and precomputed table generation unchanged."
+}

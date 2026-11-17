@@ -1,0 +1,61 @@
+--- a/cmake/libprotobuf-lite.cmake
++++ b/cmake/libprotobuf-lite.cmake
+@@ -66,12 +66,12 @@
+ 
+ add_library(libprotobuf-lite ${protobuf_SHARED_OR_STATIC}
+   ${libprotobuf_lite_files} ${libprotobuf_lite_includes} ${libprotobuf_lite_rc_files})
+-target_link_libraries(libprotobuf-lite ${CMAKE_THREAD_LIBS_INIT})
++target_link_libraries(libprotobuf-lite PUBLIC ${CMAKE_THREAD_LIBS_INIT})
+ if(protobuf_LINK_LIBATOMIC)
+-  target_link_libraries(libprotobuf-lite atomic)
++  target_link_libraries(libprotobuf-lite PUBLIC atomic)
+ endif()
+ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
+-	target_link_libraries(libprotobuf-lite log)
++	target_link_libraries(libprotobuf-lite PUBLIC log)
+ endif()
+ target_include_directories(libprotobuf-lite PUBLIC ${protobuf_source_dir}/src)
+ if(MSVC AND protobuf_BUILD_SHARED_LIBS)
+@@ -85,7 +85,4 @@
+     DEBUG_POSTFIX "${protobuf_DEBUG_POSTFIX}")
+ add_library(protobuf::libprotobuf-lite ALIAS libprotobuf-lite)
+ 
+-if(ANDROID)
+-  find_package(android_log REQUIRED)
+-  target_link_libraries(libprotobuf-lite PUBLIC android_log::android_log)
+-endif()
++# Android logging is linked above through the NDK system log library.
+--- a/cmake/libprotobuf.cmake
++++ b/cmake/libprotobuf.cmake
+@@ -120,10 +120,10 @@
+   target_link_libraries(libprotobuf PUBLIC ${ZLIB_LIBRARIES})
+ endif()
+ if(protobuf_LINK_LIBATOMIC)
+-  target_link_libraries(libprotobuf atomic)
++  target_link_libraries(libprotobuf PUBLIC atomic)
+ endif()
+ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
+-	target_link_libraries(libprotobuf log)
++	target_link_libraries(libprotobuf PUBLIC log)
+ endif()
+ target_include_directories(libprotobuf PUBLIC ${protobuf_source_dir}/src)
+ if(MSVC AND protobuf_BUILD_SHARED_LIBS)
+@@ -137,7 +137,4 @@
+     DEBUG_POSTFIX "${protobuf_DEBUG_POSTFIX}")
+ add_library(protobuf::libprotobuf ALIAS libprotobuf)
+ 
+-if(ANDROID)
+-  find_package(android_log REQUIRED)
+-  target_link_libraries(libprotobuf PUBLIC android_log::android_log)
+-endif()
++# Android logging is linked above through the NDK system log library.
+--- a/cmake/protobuf-config.cmake.in
++++ b/cmake/protobuf-config.cmake.in
+@@ -151,6 +151,4 @@
+   include("${CMAKE_CURRENT_LIST_DIR}/protobuf-module.cmake")
+ endif()
+ 
+-if(ANDROID)
+-  find_package(android_log REQUIRED)
+-endif()
++# Android log is an NDK system library, not a downstream CMake package.

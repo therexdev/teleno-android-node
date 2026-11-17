@@ -6,25 +6,28 @@ chain snapshot downloads and reward history. Docker, WSL and root are not requir
 
 ## Download
 
-**[Download Teleno Node 0.3.7 APK](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7.apk)**
-
-[Release notes and all files](https://github.com/therexdev/teleno-android-node/releases/tag/v0.3.7)
-include the APK, app source ZIP, native source/relink materials and SHA-256 checksums.
+The signed **Teleno-Node-0.3.8.apk** is supplied alongside this source archive.
+See [0.3.8 release notes](releases/0.3.8/RELEASE_NOTES.md) for Silent Mode and install instructions.
+The unchanged native engine can be rebuilt using the 0.3.7 native materials.
 
 Requires **Android 9 or newer and an ARM64 device**. Chain data requires substantial
 free storage; Setup shows the space required for the selected snapshot. Removable
 storage is offered when Android exposes a suitable app-specific SD-card location.
 
-To update, stop the node and install the APK over the existing app. Version 0.3.7
-uses package `com.koinos.teleno`, version code **15** and the same signing
+To update, stop the node and install the APK over the existing app. Version 0.3.8
+uses package `com.koinos.teleno`, version code **16** and the same signing
 certificate as the earlier installers. Keep the existing app and its data.
 
-## What changed in 0.3.7
+## What changed in 0.3.8
 
-- The installed app is named **Teleno Node** and displays the plain version **0.3.7**.
-- Setup uses **Review and start block production** wording.
-- Fixed a wallet-initialization timing issue that could interrupt the screen refresh.
-- The compact dashboard, portrait bottom menu and landscape left menu are retained.
+- Added **Silent Mode** beside Start/Stop on Home.
+- A pure-black fullscreen screensaver shows a dim, slowly moving box whose color
+  changes gradually. It displays the clock, latest finalized reward and date/time,
+  confirmed KOIN rewards this production run, reward count and a short node status.
+- Silent Mode keeps the display awake and caps this window's brightness at 5%.
+  Tap anywhere to return to Home; normal brightness and system bars return.
+- Rotation preserves Silent Mode. Backgrounding pauses the screensaver and releases
+  its screen policy; returning resumes it. Entering/exiting never restarts the node.
 
 ## Use the app
 
@@ -42,7 +45,7 @@ permissions before starting. VHP allowances are explicit wallet-approved actions
 the app does not automatically burn KOIN or transfer funds.
 
 **Home** shows time/date, KOIN, VHP, mana, block height, peers, local blocks this run,
-device readings and recent finalized rewards. Its only action is Start/Stop.
+device readings and recent finalized rewards. Its actions are Start/Stop and Silent Mode.
 **Setup** contains detailed status and health reports. **History** contains rewards
 and app actions. Local blocks this run and finalized rewards are separate measures.
 
@@ -60,10 +63,10 @@ includes pinned source archives, all 171 link inputs, licenses and instructions
 for relinking with replacement libraries. APK-signing keys and wallet data are
 not distributed.
 
-Release validation covers 13 Robolectric UI tests, package/version checks,
-v1/v2/v3 APK signatures, 16 KiB alignment and unchanged native engine hashes.
-No physical Android device was connected for this release; the label change does
-not establish production qualification. See [validation details](releases/0.3.7/validation.json).
+Release validation covers 20 Robolectric tests, package/version checks, APK
+signature verification, 16 KiB alignment and unchanged native engine hashes.
+No physical Android device or overnight connection test was available.
+See [validation details](releases/0.3.8/validation.json).
 
 Publisher certificate SHA-256:
 

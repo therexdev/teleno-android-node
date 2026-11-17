@@ -1,0 +1,7 @@
+.gradle/
+**/build/
+local.properties
+native/work/
+app/src/main/jniLibs/
+*.jks
+*.keystore
