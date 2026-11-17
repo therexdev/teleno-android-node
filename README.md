@@ -6,9 +6,17 @@ chain snapshot downloads and reward history. Docker, WSL and root are not requir
 
 ## Download
 
-The signed **Teleno-Node-0.3.8.apk** is supplied alongside this source archive.
-See [0.3.8 release notes](releases/0.3.8/RELEASE_NOTES.md) for Silent Mode and install instructions.
-The unchanged native engine can be rebuilt using the 0.3.7 native materials.
+**Latest version: 0.3.8 (build 16), including Silent Mode.**
+
+- [Download Teleno Node 0.3.8 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8.apk)
+- [Download the matching 0.3.8 source archive](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8-source.zip)
+- [SHA-256 checksums](releases/0.3.8/SHA256SUMS.txt)
+- [0.3.8 release notes and Silent Mode instructions](releases/0.3.8/RELEASE_NOTES.md)
+
+The APK and matching source are committed in this repository under
+[`releases/0.3.8`](releases/0.3.8). The links above download version 0.3.8 directly.
+The unchanged native engine can be rebuilt using the
+[0.3.7 native materials](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7-native-materials.zip).
 
 Requires **Android 9 or newer and an ARM64 device**. Chain data requires substantial
 free storage; Setup shows the space required for the selected snapshot. Removable
