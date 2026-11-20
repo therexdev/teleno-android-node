@@ -25,7 +25,7 @@ final class ProductionSetup {
             + "\nKeep the observer running. This check updates automatically; you can tap Review again at any time.");
         if (!s.hasAccount) return explain("Choose your producer account in step 3. A saved account address is enough; a live KOIN Vault connection is not required to start production.");
         if (!s.hasKey) return explain("Create or import the block-signing key in step 4. Register its public key for this producer account before starting.");
-        return new ProductionSetup(Action.REVIEW, "Ready to review. Connect power, then tap below. VHP and the registered key will be checked on your synced node before starting. KOIN Vault background checks do not block this review.");
+        return new ProductionSetup(Action.REVIEW, "Ready to review. Charging is optional; you can run on battery. VHP and the registered key will be checked on your synced node before starting. KOIN Vault background checks do not block this review.");
     }
     private static ProductionSetup explain(String note) { return new ProductionSetup(Action.EXPLAIN, note); }
 }

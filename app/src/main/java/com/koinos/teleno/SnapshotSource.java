@@ -9,13 +9,19 @@ import java.nio.charset.StandardCharsets;
 /** Platform TLS and hostname checks; fixed Foundation origins, no redirects or arbitrary URLs. */
 final class SnapshotSource implements SnapshotDownload.Source {
     final String network,base;
-    SnapshotSource(String n)throws Exception{network=n;base=SnapshotPlan.base(n);}
+    interface Connections { HttpsURLConnection open(URL url)throws IOException; }
+    final Connections connections;
+    SnapshotSource(String n)throws Exception{this(n,url->(HttpsURLConnection)url.openConnection());}
+    SnapshotSource(String n,Connections connections)throws Exception{this.connections=connections;network=n;base=SnapshotPlan.base(n);}
     InputStream relative(String path)throws Exception {
         return relative(path,0,-1);
     }
     private InputStream relative(String path,long offset,long size)throws Exception {
         if(!path.matches("[A-Za-z0-9_./-]+")||path.contains("..")||path.startsWith("/"))throw new IOException("Invalid snapshot source path.");
-        HttpsURLConnection c=(HttpsURLConnection)new URL(base+path).openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(20000);
+        URL url=new URL(base+path);
+        // A Wi-Fi-only transfer is bound to that Android network, so losing Wi-Fi
+        // cannot silently migrate the socket to cellular before the next poll.
+        HttpsURLConnection c=(HttpsURLConnection)connections.open(url);c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(20000);
         c.setRequestProperty("Accept-Encoding","identity");c.setRequestProperty("User-Agent","KAI-Teleno-Android/0.3");
         c.setRequestProperty("Connection","close");if(offset>0)c.setRequestProperty("Range","bytes="+offset+"-");
         try{

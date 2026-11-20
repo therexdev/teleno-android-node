@@ -5,7 +5,7 @@ import java.util.*;
 
 /** Protocol-2 pairing, key registration and explicitly reviewed, bounded PoB allowances. */
 final class VaultClient {
-    static final String REGISTRATION="registration", ALLOWANCE="production_allowance";
+    static final String REGISTRATION="registration", ALLOWANCE="production_allowance", BURN="burn_koin";
     static final String HOME="https://koinvault.app/", ORIGIN="https://koinosai.com";
     interface Transport { JSONObject call(String route,JSONObject body) throws Exception; }
     interface Store { JSONObject load() throws Exception; void save(JSONObject value) throws Exception; }
@@ -112,12 +112,28 @@ final class VaultClient {
         if(check==null)throw new IllegalStateException("A fresh permission review is required.");check.verify();
         sendRequest(new JSONObject().put("kind",ALLOWANCE).put("account",account).put("amount",amount.toString()),ProductionPermission.operation(account,amount),"VHP allowance and official PoB spender");
     }
-    private void sendRequest(JSONObject p,JSONObject operation,String review) throws Exception {
+    synchronized void burnKoin(BurnKoin.Snapshot reviewed,java.math.BigInteger amount,boolean approve,PermissionCheck check)throws Exception {
+        requireWallet(reviewed.permission.account);
+        if(check==null)throw new IllegalStateException("A fresh burn review is required.");check.verify();
+        JSONObject record=new JSONObject().put("kind",BURN).put("account",reviewed.permission.account).put("amount",amount.toString()).put("approveVhp",approve);
+        if(approve)record.put("productionAllowance",BurnKoin.allowance(reviewed,amount).toString());
+        sendRequest(record,BurnKoin.operations(reviewed,amount,approve),"irreversible KOIN burn, same-wallet VHP receipt"+(approve?" and exact VHP production allowance":""));
+    }
+    synchronized void checkBurn(WalletReader.Rpc rpc)throws Exception {
+        refresh();JSONObject p=pending();
+        if(p==null||!BURN.equals(kind()))throw new IllegalStateException("No saved KOIN burn request is available.");
+        String id=p.optString("txid","");
+        if(!BurnKoin.finalized(rpc,p.getString("account"),id,new java.math.BigInteger(p.getString("amount"))))
+            throw new IllegalStateException("The saved burn is not in irreversible history yet. Wait, then check again. Nothing was resent.");
+        p.put("status","observed").put("note","The exact burn transaction is irreversible: KOIN was burned and the same amount of VHP reached this wallet. Check the current VHP permission in step 5 before production.");save();
+    }
+    private void sendRequest(JSONObject p,JSONObject operation,String review)throws Exception {sendRequest(p,new JSONArray().put(operation),review);}
+    private void sendRequest(JSONObject p,JSONArray operations,String review) throws Exception {
         p.put("status","sending").put("expiresAt",Math.min(session().getLong("expiresAt"),clock.now()+10*60000L))
             .put("note","Sending one wallet request. Approval is required in KOIN Vault.");
         archivePending();state.put("pending",p);save(); // Durable before network IO; uncertain delivery never resends.
         try {
-            JSONObject sent=transport.call("dapp/request",pair().put("operations",new JSONArray().put(operation)).put("summary",new JSONObject().put("network","mainnet")));
+            JSONObject sent=transport.call("dapp/request",pair().put("operations",operations).put("summary",new JSONObject().put("network","mainnet")));
             token(sent.optString("requestId"),24);long expiry=sent.optLong("expiresAt");
             if(expiry<=clock.now()||expiry>Math.min(session().getLong("expiresAt"),clock.now()+10*60000L)+1000L)throw new IllegalStateException("Unexpected wallet request expiry.");
             p.put("requestId",sent.getString("requestId")).put("expiresAt",Math.min(expiry,p.getLong("expiresAt"))).put("status","pending")
@@ -128,7 +144,7 @@ final class VaultClient {
     }
     synchronized void observed(String account,byte[] publicKey) throws Exception {
         if(pending()!=null&&!REGISTRATION.equals(kind())){
-            if(unresolved())throw new IllegalStateException("Use Check VHP permission to resolve the saved allowance request.");
+            if(unresolved())throw new IllegalStateException("Resolve the saved wallet request using Check burn or Check VHP permission first.");
             archivePending();
         }
         JSONObject p=pending();String key=java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(publicKey);
@@ -148,6 +164,7 @@ final class VaultClient {
     }
     synchronized void dismissExpiredRegistration() throws Exception { dismissExpired(REGISTRATION); }
     synchronized void dismissExpiredAllowance() throws Exception { dismissExpired(ALLOWANCE); }
+    synchronized void dismissExpiredBurn() throws Exception { dismissExpired(BURN); }
     private void dismissExpired(String expected) throws Exception {
         if(pending()==null||!expected.equals(kind())||pending().optLong("expiresAt")>clock.now())throw new IllegalStateException("Wait until this request's approval window ends, or reject it in KOIN Vault.");
         pending().put("status","dismissed").put("note","Expired request record closed after wallet review. This does not cancel or revoke an on-chain permission. Check the local state before another review. Nothing was sent.");save();

@@ -1,4 +1,6 @@
 package com.koinos.teleno;
+import java.lang.Process;
+import android.app.Service;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.robolectric.*;
@@ -263,4 +265,246 @@ public class UiSmokeTest {
     v.runAccount="another-account";data.run(v);assertEquals(0,data.runStartedAt);v.runAccount=data.account;v.runNetwork="harbinger";data.run(v);assertEquals(0,data.runStartedAt);
   }
 
+
+  static void setPrivate(Object object,String name,Object value)throws Exception {java.lang.reflect.Field f=object.getClass().getDeclaredField(name);f.setAccessible(true);f.set(object,value);}
+  static Object getPrivate(Object object,String name)throws Exception {java.lang.reflect.Field f=object.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(object);}
+  static Object invokePrivate(Object object,String name,Class<?>[] types,Object... args)throws Exception {java.lang.reflect.Method m=object.getClass().getDeclaredMethod(name,types);m.setAccessible(true);return m.invoke(object,args);}
+  static final class FakeNode extends Process {
+    boolean alive,destroyed;final int exit;
+    FakeNode(boolean alive,int exit){this.alive=alive;this.exit=exit;}
+    public OutputStream getOutputStream(){return new ByteArrayOutputStream();}
+    public InputStream getInputStream(){return new ByteArrayInputStream(new byte[0]);}
+    public InputStream getErrorStream(){return getInputStream();}
+    public int waitFor(){alive=false;return exit;}
+    public int exitValue(){if(alive)throw new IllegalThreadStateException();return exit;}
+    public void destroy(){destroyed=true;alive=false;}
+    public boolean isAlive(){return alive;}
+  }
+  static void drainCommands(NodeService service)throws Exception {
+    ((java.util.concurrent.ExecutorService)getPrivate(service,"commands")).submit(()->{}).get(5,java.util.concurrent.TimeUnit.SECONDS);
+  }
+  @Test public void stickyRecoveryAndStopCancellation()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").putString("run-network","harbinger").putString("run-mode",NodeService.OBSERVER).putBoolean("run-wanted",true).commit();
+      assertEquals(Service.START_STICKY,service.onStartCommand(null,0,1));assertTrue(NodeService.resumeRequested(service));assertTrue((Boolean)getPrivate(service,"recovering"));
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,2);drainCommands(service);
+      assertFalse("Stop persists cancellation before any recovery",NodeService.resumeRequested(service));assertFalse((Boolean)getPrivate(service,"wanted"));
+      assertEquals(Service.START_NOT_STICKY,service.onStartCommand(null,0,3));
+    }finally{controller.destroy();}
+  }
+  @Test public void nativeExitSchedulesRecovery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").commit();
+      invokePrivate(service,"rememberRun",new Class<?>[]{ProductionReview.class,long.class},null,0L);
+      setPrivate(service,"process",new FakeNode(false,137));invokePrivate(service,"poll",new Class<?>[]{});drainCommands(service);
+      assertTrue("Native process exit keeps user's run requested",NodeService.resumeRequested(service));assertTrue((Boolean)getPrivate(service,"recovering"));
+      assertTrue(NodeService.snapshot().detail.contains("137"));assertTrue(NodeService.snapshot().detail.contains("Stop node"));
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,2);drainCommands(service);assertFalse(NodeService.resumeRequested(service));
+    }finally{controller.destroy();}
+  }
+  @Test public void stoppedStartCannotReenableRecovery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,1);drainCommands(service);
+      try{invokePrivate(service,"rememberRun",new Class<?>[]{ProductionReview.class,long.class},null,0L);fail("cancelled start must not be persisted");}
+      catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause() instanceof java.io.InterruptedIOException);}
+      assertFalse(NodeService.resumeRequested(service));
+    }finally{controller.destroy();}
+  }
+  @Test public void changedNetworkCancelsStickyRecovery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","mainnet").putString("run-network","harbinger").putString("run-mode",NodeService.OBSERVER).putBoolean("run-wanted",true).commit();
+      assertEquals(Service.START_NOT_STICKY,service.onStartCommand(null,0,1));assertFalse(NodeService.resumeRequested(service));
+    }finally{controller.destroy();}
+  }
+  @Test public void wifiDropKeepsNativeProcessOpen()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").commit();
+      service.getSharedPreferences("storage",0).edit().clear().commit();
+      org.robolectric.shadows.ShadowStatFs.registerStats(service.getNoBackupFilesDir().getPath(),3000000,2000000,2000000);
+      ActivityManager.MemoryInfo memory=new ActivityManager.MemoryInfo();memory.totalMem=8L*1024*1024*1024;memory.availMem=3L*1024*1024*1024;
+      Shadows.shadowOf(service.getSystemService(ActivityManager.class)).setMemoryInfo(memory);Shadows.shadowOf(service.getSystemService(NotificationManager.class)).setNotificationsEnabled(true);
+      invokePrivate(service,"rememberRun",new Class<?>[]{ProductionReview.class,long.class},null,0L);
+      FakeNode process=new FakeNode(true,0);setPrivate(service,"process",process);setPrivate(service,"mode",NodeService.OBSERVER);
+      invokePrivate(service,"poll",new Class<?>[]{});drainCommands(service);
+      assertFalse("Wi-Fi loss does not destroy the miner",process.destroyed);assertTrue(NodeService.snapshot().phase.contains("Reconnecting"));assertTrue(NodeService.resumeRequested(service));
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,2);drainCommands(service);
+    }finally{controller.destroy();}
+  }
+  @Test public void burnReviewShowsExactCombinedTransaction()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();
+    a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    ProductionPermission.Snapshot permission=new ProductionPermission.Snapshot("1111111111111111111114oLvT2",new java.math.BigInteger("300000000"),new java.math.BigInteger("200000000"),System.currentTimeMillis());
+    BurnKoin.Snapshot snapshot=new BurnKoin.Snapshot(permission,"19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",new java.math.BigInteger("1000000000"),new java.math.BigInteger("500000000"));
+    a.showBurnReview(snapshot,new java.math.BigInteger("123456789"),true);
+    AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+    assertTrue(text.contains("Burn: 1.23456789 KOIN"));assertTrue(text.contains("2 → 4.23456789 VHP"));assertTrue(text.contains("irreversible"));assertTrue(text.contains(permission.account));
+    dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertFalse(dialog.isShowing());controller.pause().stop().destroy();
+  }
+
+  @Test public void mobileDataWarningRequiresExplicitDownloadApproval()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();
+    a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    String manifest=Files.readString(Paths.get("tests/fixtures/mainnet-manifest.json")),files=Files.readString(Paths.get("tests/fixtures/mainnet-files.json"));
+    SnapshotPlan plan=new SnapshotPlan("mainnet",new org.json.JSONObject(manifest).getString("backup_id"),manifest,files);int[] started={0};
+    a.showMobileDownloadReview(plan,plan.bytes/2,()->started[0]++);AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+    String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+    assertTrue(text.contains(DataUse.size(plan.bytes)));assertTrue(text.contains(DataUse.size(plan.bytes/2)));assertTrue(text.contains("carrier/roaming charges"));assertTrue(text.contains("does not enable ongoing"));
+    assertEquals(0,started[0]);dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals("Cancel transfers no data",0,started[0]);
+    a.showMobileDownloadReview(plan,plan.bytes,()->started[0]++);dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+    assertEquals("Download using mobile data",dialog.getButton(DialogInterface.BUTTON_POSITIVE).getText().toString());
+    dialog.getButton(DialogInterface.BUTTON_POSITIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(1,started[0]);controller.pause().stop().destroy();
+  }
+  @Test public void cellularAndMeteredWifiAlwaysNeedConsent() {
+    android.net.NetworkCapabilities wifi=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    assertFalse(NetworkPolicy.costly(wifi));wifi.removeCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);assertTrue(NetworkPolicy.costly(wifi));
+    android.net.NetworkCapabilities mobile=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    assertTrue("Even unlimited cellular needs a warning",NetworkPolicy.costly(mobile));
+    android.net.NetworkCapabilities wired=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_ETHERNET).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);assertFalse(NetworkPolicy.costly(wired));
+  }
+  @Test public void snapshotNetworkIsBoundAndMobileIsBlockedWithoutConsent()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();android.net.ConnectivityManager cm=context.getSystemService(android.net.ConnectivityManager.class);
+    org.robolectric.shadows.ShadowConnectivityManager manager=Shadows.shadowOf(cm);
+    manager.setActiveNetworkInfo(org.robolectric.shadows.ShadowNetworkInfo.newInstance(android.net.NetworkInfo.DetailedState.CONNECTED,android.net.ConnectivityManager.TYPE_MOBILE,0,true,true));
+    android.net.Network active=cm.getActiveNetwork();assertNotNull(active);
+    android.net.NetworkCapabilities mobile=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    manager.setNetworkCapabilities(active,mobile);
+    try {NetworkPolicy.downloadNetwork(context,false);fail("No mobile request before consent");}catch(IOException expected){assertTrue(expected.getMessage().contains("before using mobile"));}
+    assertSame("Approved transfer uses the checked Android network",active,NetworkPolicy.downloadNetwork(context,true));
+    mobile.removeTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR).addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    manager.setNetworkCapabilities(active,mobile);assertSame(active,NetworkPolicy.downloadNetwork(context,false));
+  }
+  static File savedChain(android.content.Context context,String network,String gen)throws Exception {
+    File folder=new File(context.getNoBackupFilesDir(),"teleno-chain/"+network+"-"+gen);new File(folder,"db").mkdirs();new File(folder,"blockchain").mkdirs();
+    Files.writeString(new File(folder,"storage.id").toPath(),gen);Files.writeString(new File(folder,"db/CURRENT").toPath(),"MANIFEST-000001\n");Files.writeString(new File(folder,"db/MANIFEST-000001").toPath(),"saved chain fixture");return folder;
+  }
+  @Test public void savedPhoneChainIsFoundAfterSelectionWasLost()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="a".repeat(32);File folder=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().clear().commit();assertFalse(NodeStorage.hasChain(context,"mainnet"));assertTrue(NodeStorage.hasRecoverableChain(context,"mainnet"));
+    java.util.List<NodeStorage.Existing> found=NodeStorage.findExisting(context,"mainnet");assertEquals(1,found.size());assertEquals("phone",found.get(0).volume);assertEquals(gen,found.get(0).generation);
+    assertEquals("MANIFEST-000001\n",Files.readString(new File(folder,"db/CURRENT").toPath()));assertTrue(new File(folder,"db/MANIFEST-000001").exists());
+    assertEquals("Searching does not change the saved selection","",NodeStorage.generation(context,"mainnet"));
+  }
+  @Test public void discoveryExcludesUnverifiedDownloadsAndOtherNetworks()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();File incomplete=savedChain(context,"mainnet","b".repeat(32));new File(incomplete,"storage.id").delete();
+    savedChain(context,"harbinger","c".repeat(32));assertTrue(NodeStorage.findExisting(context,"mainnet").isEmpty());
+    assertTrue("Search preserves incomplete files",new File(incomplete,"db/CURRENT").exists());
+  }
+  @Test public void existingChainNextStepDoesNotRequestAnotherSnapshot()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);
+    a.getSharedPreferences("settings",0).edit().clear().putString("network","mainnet").commit();File folder=savedChain(a,"mainnet","d".repeat(32));
+    a.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation","d".repeat(32)).commit();
+    controller.create().start().resume().visible();assertTrue(NodeStorage.hasChain(a,"mainnet"));TextView next=(TextView)getPrivate(a,"next");
+    assertTrue(next.getText().toString().contains("No new snapshot or backup cleanup"));assertTrue(new File(folder,"db/CURRENT").exists());controller.pause().stop().destroy();
+  }
+  @Test public void backupDeletionIsClearlyOptional()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    invokePrivate(a,"cleanStorage",new Class<?>[]{});AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+    assertTrue(text.contains("OPTIONAL"));assertTrue(text.contains("never required to start"));dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();controller.pause().stop().destroy();
+  }
+
+  @org.robolectric.annotation.Implements(value=NativeFiles.class,isInAndroidSdk=false)
+  public static class ShadowOwnership {
+    static final java.util.Map<Integer,RandomAccessFile> handles=new java.util.HashMap<>();static int next=1;
+    @org.robolectric.annotation.Implementation protected static void __staticInitializer__(){}
+    @org.robolectric.annotation.Implementation protected static int lock(String path)throws IOException {
+      RandomAccessFile file=new RandomAccessFile(path,"rw");try{if(file.getChannel().tryLock()==null)throw new IOException("busy");int id=next++;handles.put(id,file);return id;}catch(Exception e){file.close();throw e;}
+    }
+    @org.robolectric.annotation.Implementation protected static void unlock(int id)throws IOException {RandomAccessFile file=handles.remove(id);if(file!=null)file.close();}
+  }
+  /** Robolectric cannot fsync directories; data and link operations still use real host files. */
+  @org.robolectric.annotation.Implements(android.system.Os.class)
+  public static class ShadowDirectorySync {
+    @org.robolectric.annotation.Implementation protected static java.io.FileDescriptor open(String path,int flags,int mode){return new java.io.FileDescriptor();}
+    @org.robolectric.annotation.Implementation protected static void fsync(java.io.FileDescriptor fd){}
+    @org.robolectric.annotation.Implementation protected static void close(java.io.FileDescriptor fd){}
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void reconnectRepairsLostSelectionWithoutChangingTheDatabase()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="e".repeat(32);File folder=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().clear().commit();NodeStorage.reconnect(context,"mainnet","phone",gen);
+    assertEquals(gen,NodeStorage.generation(context,"mainnet"));assertTrue(NodeStorage.hasChain(context,"mainnet"));
+    File link=new File(NodeConfig.root(context,"mainnet"),"db");assertTrue(Files.isSymbolicLink(link.toPath()));assertEquals(new File(folder,"db").toPath(),Files.readSymbolicLink(link.toPath()));
+    assertEquals("saved chain fixture",Files.readString(new File(folder,"db/MANIFEST-000001").toPath()));assertFalse(SnapshotBootstrap.pending(context,"mainnet"));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void updateRepairsMissingLinksForTheSavedGeneration()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="f".repeat(32);File folder=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation",gen).commit();
+    assertFalse(new File(NodeConfig.root(context,"mainnet"),"db").exists());NodeStorage.ensureReady(context,"mainnet");
+    assertTrue(Files.isSymbolicLink(new File(NodeConfig.root(context,"mainnet"),"db").toPath()));assertTrue(new File(folder,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void cleanupDeletesOnlyTheSeparateValidatedBackup()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String active="1".repeat(32),old="2".repeat(32);File current=savedChain(context,"mainnet",active),backup=savedChain(context,"mainnet",old);
+    NodeStorage.reconnect(context,"mainnet","phone",active);
+    String retained=new org.json.JSONObject().put("volume","phone").put("generation",old).put("backup",active).toString();
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-retained",retained).putString("mainnet-validated",active).commit();
+    File keySentinel=new File(context.getNoBackupFilesDir(),"signer-sentinel.gcm");Files.writeString(keySentinel.toPath(),"keep");
+    NodeStorage.clean(context,"mainnet");assertFalse(backup.exists());assertTrue(new File(current,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));assertEquals("keep",Files.readString(keySentinel.toPath()));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void cleanupRefusesUnreadableActiveChainAndPreservesTheBackup()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String active="3".repeat(32),old="4".repeat(32);File current=savedChain(context,"mainnet",active),backup=savedChain(context,"mainnet",old);
+    NodeStorage.reconnect(context,"mainnet","phone",active);
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-retained",new org.json.JSONObject().put("volume","phone").put("generation",old).put("backup",active).toString()).putString("mainnet-validated",active).commit();
+    new File(current,"db/CURRENT").delete();try{NodeStorage.clean(context,"mainnet");fail("No backup deletion when active chain is unreadable");}catch(IOException expected){assertTrue(expected.getMessage().contains("blocked"));}
+    assertTrue(new File(backup,"db/CURRENT").exists());assertTrue(NodeStorage.retained(context,"mainnet"));
+  }
+
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void discardKeepsACompletedChainWhenItsSelectionWasLost()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="5".repeat(32);File saved=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().clear().commit();
+    File record=new File(context.getNoBackupFilesDir(),"chain-download-mainnet.json");Files.writeString(record.toPath(),new org.json.JSONObject().put("volume","phone").put("generation",gen).toString());
+    SnapshotBootstrap.discard(context,"mainnet");assertFalse(SnapshotBootstrap.pending(context,"mainnet"));assertTrue("Published chain is never discarded as a partial download",new File(saved,"db/CURRENT").exists());assertTrue(NodeStorage.hasRecoverableChain(context,"mainnet"));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void completedRestoreRecordIsReconciledWithoutAnotherDownload()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="6".repeat(32);File saved=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation",gen).commit();
+    File record=new File(context.getNoBackupFilesDir(),"chain-download-mainnet.json");Files.writeString(record.toPath(),new org.json.JSONObject().put("volume","phone").put("generation",gen).toString());
+    SnapshotBootstrap.finishCompleted(context,"mainnet");assertFalse(SnapshotBootstrap.pending(context,"mainnet"));assertTrue(new File(saved,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));
+  }
+
+  static void readyForBatteryTest(NodeService service)throws Exception {
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").commit();service.getSharedPreferences("storage",0).edit().clear().commit();
+    org.robolectric.shadows.ShadowStatFs.registerStats(service.getNoBackupFilesDir().getPath(),3000000,2000000,2000000);
+    ActivityManager.MemoryInfo memory=new ActivityManager.MemoryInfo();memory.totalMem=8L<<30;memory.availMem=3L<<30;
+    Shadows.shadowOf(service.getSystemService(ActivityManager.class)).setMemoryInfo(memory);Shadows.shadowOf(service.getSystemService(NotificationManager.class)).setNotificationsEnabled(true);
+    android.net.ConnectivityManager cm=service.getSystemService(android.net.ConnectivityManager.class);org.robolectric.shadows.ShadowConnectivityManager manager=Shadows.shadowOf(cm);
+    manager.setActiveNetworkInfo(org.robolectric.shadows.ShadowNetworkInfo.newInstance(android.net.NetworkInfo.DetailedState.CONNECTED,android.net.ConnectivityManager.TYPE_WIFI,0,true,true));
+    manager.setNetworkCapabilities(cm.getActiveNetwork(),new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED));
+    Shadows.shadowOf(service.getSystemService(PowerManager.class)).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_NONE);
+  }
+  @Test public void observerAndProducerCanStartAndRemainEligibleOnBattery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    try {
+      readyForBatteryTest(service);
+      // A missing battery broadcast also cannot impose a charger requirement.
+      invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);
+      for(int plugged:new int[]{0,1,0}){
+        service.sendStickyBroadcast(new Intent(Intent.ACTION_BATTERY_CHANGED).putExtra(BatteryManager.EXTRA_PLUGGED,plugged).putExtra(BatteryManager.EXTRA_LEVEL,65).putExtra(BatteryManager.EXTRA_SCALE,100));
+        invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},false);
+        invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);
+      }
+    }finally{controller.destroy();}
+  }
+  @Test public void runningOnBatteryStillEnforcesHeatAndStorageProtection()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    try {
+      readyForBatteryTest(service);service.sendStickyBroadcast(new Intent(Intent.ACTION_BATTERY_CHANGED).putExtra(BatteryManager.EXTRA_PLUGGED,0));
+      Shadows.shadowOf(service.getSystemService(PowerManager.class)).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_SEVERE);
+      try{invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);fail("Overheating still pauses production");}
+      catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("too hot"));}
+      Shadows.shadowOf(service.getSystemService(PowerManager.class)).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_NONE);
+      org.robolectric.shadows.ShadowStatFs.registerStats(service.getNoBackupFilesDir().getPath(),3000000,1,1);
+      try{invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);fail("Low storage still pauses production");}
+      catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("2 GiB"));}
+    }finally{controller.destroy();}
+  }
 }

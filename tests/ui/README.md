@@ -1,7 +1,7 @@
 # Native Android UI smoke tests
 
 These tests run the actual native Android view code with Robolectric 4.16,
-Android 13 / API 33 and native graphics. They are not physical-device tests.
+Android 13 / API 33 and native graphics. The host compile/runtime Android JAR is API 36 to resolve newer Robolectric shadow signatures; the test sandbox stays on API 33. They are not physical-device tests.
 The balance/reward fixtures use a synthetic address and invented amounts; no
 wallet is connected and no transaction is signed. The actual MainActivity test
 loads without packaged native assets, so its setup screenshot intentionally
@@ -16,7 +16,7 @@ grouped errors and a clipboard report without raw exception text. Permission
 reviews retain their exact amounts and cancellation path. Screenshot-protection
 checks keep normal UI capturable and private key import/export protected.
 
-Twenty tests run in total. Compact dashboard checks cover 360×640 portrait,
+Forty-one tests run in total. Compact dashboard checks cover 360×640 portrait,
 960×540 Retroid landscape and 640×360 landscape with system-bar insets, alongside
 412×915 portrait, 915×412 landscape and 360×800 at 1.3× text scale. They verify
 non-scrolling Home, the Start/Stop and Silent Mode actions, KOIN above VHP, all nonempty
@@ -58,3 +58,24 @@ These are simulated checks, not an overnight device soak test.
 Run-reward tests use exact integer amounts larger than JavaScript's safe integer
 range, more rewards than the dashboard feed, duplicate history reads, unrelated
 accounts/networks, excluded non-reward records, and run start/stop boundaries.
+
+Recovery tests cover sticky restart, Stop cancellation, cancelling a start before
+it can save recovery intent, changed-network cancellation, native exit recovery,
+Wi-Fi loss without process destruction and exact burn-review cancellation.
+The host Java tests separately cover watchdog deadlines/backoff, exact burn ABI,
+zero balances, mana, stale reviews, irreversible confirmation and unknown-delivery
+recovery without duplicate wallet submission.
+
+The 0.3.10 tests add explicit/cancelled mobile-data consent, metered Wi-Fi and
+unlimited-cellular classification, checked-network binding, saved phone-chain
+discovery, network/incomplete-download exclusion, existing-chain next actions,
+optional cleanup text, lost-selection reconnection, missing-link repair,
+separate-backup deletion, active-chain protection and stale completed-download
+record handling. Storage integration uses real host files/symlinks and test
+shadows for ownership locks and directory fsync; physical Android durability
+still needs device validation.
+
+Version 0.3.11 adds checks that observer and producer environment validation accepts
+battery operation, absent battery broadcasts and unplugging, while continuing to
+reject severe heat and insufficient storage. These are Android simulations,
+not a physical-device battery endurance test.
