@@ -16,7 +16,7 @@ grouped errors and a clipboard report without raw exception text. Permission
 reviews retain their exact amounts and cancellation path. Screenshot-protection
 checks keep normal UI capturable and private key import/export protected.
 
-Thirty-nine tests run in total. Compact dashboard checks cover 360×640 portrait,
+Forty-one tests run in total. Compact dashboard checks cover 360×640 portrait,
 960×540 Retroid landscape and 640×360 landscape with system-bar insets, alongside
 412×915 portrait, 915×412 landscape and 360×800 at 1.3× text scale. They verify
 non-scrolling Home, the Start/Stop and Silent Mode actions, KOIN above VHP, all nonempty
@@ -74,3 +74,8 @@ separate-backup deletion, active-chain protection and stale completed-download
 record handling. Storage integration uses real host files/symlinks and test
 shadows for ownership locks and directory fsync; physical Android durability
 still needs device validation.
+
+Version 0.3.11 adds checks that observer and producer environment validation accepts
+battery operation, absent battery broadcasts and unplugging, while continuing to
+reject severe heat and insufficient storage. These are Android simulations,
+not a physical-device battery endurance test.

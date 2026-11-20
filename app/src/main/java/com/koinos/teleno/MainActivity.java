@@ -119,7 +119,7 @@ public final class MainActivity extends Activity {
         cleanStorage=button(device,"Delete previous backup (optional)…",this::cleanStorage);
         device.addView(text("Chain data can use a removable SD card. Signing keys and wallet connection details stay protected on the phone. Keep the card inserted while the node runs.",14,MUTED,false));
         button(device, "Android notification settings", () -> startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())));
-        device.addView(text("Use unmetered Wi-Fi and leave room for the growing chain. The app stops if storage is low or the device overheats. Block production requires power. No Docker, WSL or root is used.", 14, MUTED, false));
+        device.addView(text("Use Wi-Fi or explicitly approved mobile data and leave room for the growing chain. The node and miner can run on battery. The app pauses if storage is low or the device overheats. No Docker, WSL or root is used.", 14, MUTED, false));
         reliabilityText=text("",14,MUTED,false);device.addView(reliabilityText);
         button(device,"Allow unrestricted background running",this::backgroundSettings).setTag("background-running");
         device.addView(text("Automatic recovery keeps a user-started run active through temporary network or process interruptions and reboots. Stop node cancels it. Android force-stop, a powered-off device, missing storage and overheating still interrupt mining.",14,MUTED,false));
@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
         production = button(produce, "Review and start block production…", this::reviewProduction);
         button(produce,"Production health / copy report",()->{if(shell!=null)shell.showProductionHealth();}).setTag("production-health");
         if (!productionQualified) produce.addView(text(experimentalProduction
-            ? "Keep the phone powered and cool; use Stop node to stop production. Automatic recovery resumes this reviewed producer after fresh observer checks. Stop node cancels recovery."
+            ? "Charging is optional. Keep the phone cool; use Stop node to stop production. Automatic recovery resumes this reviewed producer after fresh observer checks. Stop node cancels recovery."
             : "This app is observer-only. Install the full Teleno Node app to enable block production.", 14, UiKit.AMBER, true));
         LinearLayout activity = card("What's happening"); recent = text("", 14, MUTED, false); activity.addView(recent);
         button(activity, "Open-source notices", this::showNotices);
@@ -658,7 +658,7 @@ public final class MainActivity extends Activity {
                     if (latest.action != ProductionSetup.Action.REVIEW) { explainProduction(latest, now); return; }
                     new AlertDialog.Builder(this).setTitle("Start block production on " + networkLabel + "?")
                         .setMessage("Network: " + networkLabel + "\nProducer: " + account + "\nPublic signing key: " + LocalRpc.b64(publicKey)
-                            + "\n\nAutomatic recovery will resume this same producer after temporary interruptions or reboot, following fresh observer, key and VHP checks. Stop node cancels automatic recovery.\n\nThis enables real block signing on the selected network. Keep the phone on power and stop any other node using this key. The app will recheck sync, VHP and registration, stop the observer cleanly, then start production. Use Stop node to stop production. Successful blocks consume VHP for KOIN rewards. This start action does not submit a separate token transaction.")
+                            + "\n\nAutomatic recovery will resume this same producer after temporary interruptions or reboot, following fresh observer, key and VHP checks. Stop node cancels automatic recovery.\n\nThis enables real block signing on the selected network. The phone can run on battery. Stop any other node using this key. The app will recheck sync, VHP and registration, stop the observer cleanly, then start production. Use Stop node to stop production. Successful blocks consume VHP for KOIN rewards. This start action does not submit a separate token transaction.")
                         .setNegativeButton("Keep observer", null).setPositiveButton("Check and start production", (d, w) -> {
                             if (!chosen.equals(network) || !account.equals(getSharedPreferences("settings", MODE_PRIVATE).getString("producer-" + chosen, ""))) { message("Review again", "The network or producer account changed. Tap Review again to confirm the current account."); return; }
                             NodeService.ViewState node = NodeService.snapshot();

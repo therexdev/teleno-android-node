@@ -313,10 +313,6 @@ public final class NodeService extends Service {
         synchronized (LOCK) { VIEW.freeBytes = free; }
         if (free < 2L * 1024 * 1024 * 1024) throw new Pause("Free at least 2 GiB before starting. The full chain needs additional growing storage.");
         if (Build.VERSION.SDK_INT >= 29 && getSystemService(PowerManager.class).getCurrentThermalStatus() >= PowerManager.THERMAL_STATUS_SEVERE) throw new Pause("The device is too hot. Let it cool before restarting the observer.");
-        if (producer) {
-            Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-            if (battery == null || battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) == 0) throw new Pause("Connect power before starting block production.");
-        }
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
         if (nc == null || !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) throw new Disconnected();

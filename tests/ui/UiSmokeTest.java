@@ -469,4 +469,42 @@ public class UiSmokeTest {
     File record=new File(context.getNoBackupFilesDir(),"chain-download-mainnet.json");Files.writeString(record.toPath(),new org.json.JSONObject().put("volume","phone").put("generation",gen).toString());
     SnapshotBootstrap.finishCompleted(context,"mainnet");assertFalse(SnapshotBootstrap.pending(context,"mainnet"));assertTrue(new File(saved,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));
   }
+
+  static void readyForBatteryTest(NodeService service)throws Exception {
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").commit();service.getSharedPreferences("storage",0).edit().clear().commit();
+    org.robolectric.shadows.ShadowStatFs.registerStats(service.getNoBackupFilesDir().getPath(),3000000,2000000,2000000);
+    ActivityManager.MemoryInfo memory=new ActivityManager.MemoryInfo();memory.totalMem=8L<<30;memory.availMem=3L<<30;
+    Shadows.shadowOf(service.getSystemService(ActivityManager.class)).setMemoryInfo(memory);Shadows.shadowOf(service.getSystemService(NotificationManager.class)).setNotificationsEnabled(true);
+    android.net.ConnectivityManager cm=service.getSystemService(android.net.ConnectivityManager.class);org.robolectric.shadows.ShadowConnectivityManager manager=Shadows.shadowOf(cm);
+    manager.setActiveNetworkInfo(org.robolectric.shadows.ShadowNetworkInfo.newInstance(android.net.NetworkInfo.DetailedState.CONNECTED,android.net.ConnectivityManager.TYPE_WIFI,0,true,true));
+    manager.setNetworkCapabilities(cm.getActiveNetwork(),new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED));
+    Shadows.shadowOf(service.getSystemService(PowerManager.class)).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_NONE);
+  }
+  @Test public void observerAndProducerCanStartAndRemainEligibleOnBattery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    try {
+      readyForBatteryTest(service);
+      // A missing battery broadcast also cannot impose a charger requirement.
+      invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);
+      for(int plugged:new int[]{0,1,0}){
+        service.sendStickyBroadcast(new Intent(Intent.ACTION_BATTERY_CHANGED).putExtra(BatteryManager.EXTRA_PLUGGED,plugged).putExtra(BatteryManager.EXTRA_LEVEL,65).putExtra(BatteryManager.EXTRA_SCALE,100));
+        invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},false);
+        invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);
+      }
+    }finally{controller.destroy();}
+  }
+  @Test public void runningOnBatteryStillEnforcesHeatAndStorageProtection()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    try {
+      readyForBatteryTest(service);service.sendStickyBroadcast(new Intent(Intent.ACTION_BATTERY_CHANGED).putExtra(BatteryManager.EXTRA_PLUGGED,0));
+      Shadows.shadowOf(service.getSystemService(PowerManager.class)).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_SEVERE);
+      try{invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);fail("Overheating still pauses production");}
+      catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("too hot"));}
+      Shadows.shadowOf(service.getSystemService(PowerManager.class)).setCurrentThermalStatus(PowerManager.THERMAL_STATUS_NONE);
+      org.robolectric.shadows.ShadowStatFs.registerStats(service.getNoBackupFilesDir().getPath(),3000000,1,1);
+      try{invokePrivate(service,"requireEnvironment",new Class<?>[]{boolean.class},true);fail("Low storage still pauses production");}
+      catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("2 GiB"));}
+    }finally{controller.destroy();}
+  }
 }

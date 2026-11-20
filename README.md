@@ -8,18 +8,21 @@ chain snapshot downloads and reward history. Docker, WSL and root are not requir
 
 Published download: [Teleno Node 0.3.8 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8.apk).
 
-**Prepared update: 0.3.10 (build 18)** adds mobile-data downloads, existing-chain
-recovery and clearer setup, alongside the mining recovery and wallet burns from
+**Prepared update: 0.3.11 (build 19)** allows the node and miner to run on battery, and includes mobile-data downloads,
+existing-chain recovery and clearer setup alongside the mining recovery and wallet burns from
 prepared version 0.3.9. Its signed APK, source and checksums are supplied separately
 in ChatGPT while physical-device validation is pending. The source changes are in
-[draft PR #1](https://github.com/therexdev/teleno-android-node/pull/1); a 0.3.10
+[draft PR #1](https://github.com/therexdev/teleno-android-node/pull/1); a 0.3.11
 binary release has not been published to GitHub.
 
 Requires **Android 9 or newer and ARM64**. Stop the node and install the update
 over the existing app; do not uninstall or clear its data. The package remains
-`com.koinos.teleno`, uses version code **18** and retains the same signing certificate.
+`com.koinos.teleno`, uses version code **19** and retains the same signing certificate.
 
-## What changed in 0.3.10
+## What changed in 0.3.11
+
+- Run the observer and block producer on battery. Charging is optional; unplugging
+  no longer pauses mining or blocks automatic recovery.
 
 - Use an existing downloaded chain as the normal next step. A new snapshot is optional.
 - Find and reconnect complete chain data in the app's phone or SD-card locations.
@@ -30,7 +33,7 @@ over the existing app; do not uninstall or clear its data. The package remains
 - Keep automatic mining recovery, Silent Mode and explicit KOIN-to-VHP wallet
   reviews from prepared 0.3.9.
 
-See [0.3.10 setup and recovery instructions](releases/0.3.10/RELEASE_NOTES.md).
+See [0.3.11 setup and recovery instructions](releases/0.3.11/RELEASE_NOTES.md).
 The unchanged native engine can be rebuilt from the
 [0.3.7 native materials](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7-native-materials.zip).
 
@@ -68,10 +71,10 @@ includes pinned source archives, all 171 link inputs, licenses and instructions
 for relinking with replacement libraries. APK-signing keys and wallet data are
 not distributed.
 
-Release validation covers 39 Robolectric tests, package/version checks, APK
+Release validation covers 41 Robolectric tests, package/version checks, APK
 signature verification, 16 KiB alignment and unchanged native engine hashes.
 No physical Android device, overnight connection test or live burn transaction was available.
-See [validation details](releases/0.3.10/validation.json).
+See [validation details](releases/0.3.11/validation.json).
 
 Publisher certificate SHA-256:
 
