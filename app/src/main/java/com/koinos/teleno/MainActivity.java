@@ -41,6 +41,8 @@ public final class MainActivity extends Activity {
     private boolean burnBusy;
     private ProductionPermission.Snapshot permissionSnapshot;
     private TextView snapshotText, snapshotSetupText;private Button downloadChain,discardDownload;private ProgressBar snapshotProgress;private boolean snapshotBusy;
+    private Button findChain,replaceChain;
+    private boolean findingChain,notificationSnapshotReplace;
     private Button storageButton, cleanStorage, connectWallet, openWallet, disconnectWallet, registerWallet, checkWallet, checkRegistration, dismissRegistration;
     private static volatile VaultClient walletClient;
     private static volatile String walletNotice="";
@@ -59,7 +61,9 @@ public final class MainActivity extends Activity {
         } catch (Exception ignored) { engineAvailable = productionQualified = experimentalProduction = false; }
         dashboard = new DashboardController(this, () -> { if (!isDestroyed()) refresh(); });
         build(); if(saved!=null) { shell.select(saved.getInt("screen",0),false); shell.setup.post(() -> shell.setup.scrollTo(0,saved.getInt("setup-scroll",0)));if(saved.getBoolean("silent-mode",false))silent.enter(); }
-        refresh(); walletAction("",c->{},false,false);
+        refresh();
+        work.execute(()->{try{if(!NodeService.isActive())SnapshotBootstrap.finishCompleted(this,network);}catch(Exception ignored){}handler.post(()->{if(!isDestroyed())refresh();});});
+        walletAction("",c->{},false,false);
     }
     @Override protected void onResume() { super.onResume(); resumed=true;if(NodeService.resumeRequested(this)&&!NodeService.isActive()) {
         try {startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.RECOVER));}catch(RuntimeException e){NodeService.saveReason(this,"Open Setup and Start observer to restore the saved node run.");}
@@ -112,19 +116,21 @@ public final class MainActivity extends Activity {
         networkButton = button(device, "Network", this::changeNetwork);
         storageText=text("",14,INK,false);device.addView(storageText);
         storageButton=button(device,"Choose phone or SD card storage",this::changeStorage);
-        cleanStorage=button(device,"Remove previous database copy…",this::cleanStorage);
+        cleanStorage=button(device,"Delete previous backup (optional)…",this::cleanStorage);
         device.addView(text("Chain data can use a removable SD card. Signing keys and wallet connection details stay protected on the phone. Keep the card inserted while the node runs.",14,MUTED,false));
         button(device, "Android notification settings", () -> startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())));
         device.addView(text("Use unmetered Wi-Fi and leave room for the growing chain. The app stops if storage is low or the device overheats. Block production requires power. No Docker, WSL or root is used.", 14, MUTED, false));
         reliabilityText=text("",14,MUTED,false);device.addView(reliabilityText);
         button(device,"Allow unrestricted background running",this::backgroundSettings).setTag("background-running");
         device.addView(text("Automatic recovery keeps a user-started run active through temporary network or process interruptions and reboots. Stop node cancels it. Android force-stop, a powered-off device, missing storage and overheating still interrupt mining.",14,MUTED,false));
-        LinearLayout sync = card("2  ·  Download the chain for faster sync");
-        sync.addView(text("Optional: download a native Teleno snapshot from the Koinos Foundation to the storage selected above. Review its size, then download, verify and restore it. An observer starts afterward to catch up. No wallet is needed for this step.", 14, MUTED, false));
+        LinearLayout sync = card("2  ·  Use an existing chain or download one");
+        sync.addView(text("If chain data is already on this device, use it and let the observer catch up. A new snapshot is optional. For a new download, review the size and choose Wi-Fi or explicitly approve mobile data. No wallet is needed for this step.", 14, MUTED, false));
         snapshotSetupText=text("",14,INK,true);sync.addView(snapshotSetupText);
         snapshotText=text("",14,INK,false);snapshotText.setTextIsSelectable(true);sync.addView(snapshotText);
         snapshotProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);snapshotProgress.setMax(100);sync.addView(snapshotProgress,new LinearLayout.LayoutParams(-1,dp(10)));
         downloadChain=button(sync,"Download chain snapshot…",this::reviewSnapshot);
+        findChain=button(sync,"Find existing chain data…",this::findExistingChain);findChain.setTag("find-existing-chain");
+        replaceChain=button(sync,"Advanced · replace chain with a newer snapshot…",()->reviewSnapshot(true));
         discardDownload=button(sync,"Discard unfinished download…",()->new AlertDialog.Builder(this).setTitle("Discard the unfinished download?")
             .setMessage("Only the inactive snapshot download will be deleted. The current chain database, wallet connection and signing keys are kept. You can then check for a newer snapshot or start the observer normally.")
             .setNegativeButton("Keep download",null).setPositiveButton("Discard download",(d,w)->{if(!NodeService.isActive())send(NodeService.DISCARD_DOWNLOAD);}).show());
@@ -193,9 +199,9 @@ public final class MainActivity extends Activity {
         try {free=NodeStorage.free(this,network);}catch(Exception e){storageProblem=e.getMessage();}
         String freeLabel=free<0?"Storage unavailable":String.format(java.util.Locale.ROOT,"%.1f GiB free",free/1073741824.0);
         storageText.setText("Chain storage: "+NodeStorage.label(this,network)+"\n"+freeLabel+(storageProblem.isEmpty()?"":"\n"+storageProblem)
-            +(NodeStorage.retained(this,network)?"\nPrevious database copy retained. After the new observer advances, stop it and remove that copy to reclaim space.":""));
+            +(NodeStorage.retained(this,network)?"\nPrevious backup retained. Deleting it is optional and is never required to start the current chain.":""));
         ActivityManager.MemoryInfo memory = new ActivityManager.MemoryInfo(); getSystemService(ActivityManager.class).getMemoryInfo(memory);
-        state.setText(v.phase); detail.setText(!v.active && !v.busy && getSharedPreferences("settings", MODE_PRIVATE).getBoolean("unfinished-run", false) ? "The previous run was interrupted. Chain data was preserved. Start an observer to recover; automatic recovery will retry the saved run." : v.detail);
+        state.setText(v.phase); detail.setText(!v.active && !v.busy && getSharedPreferences("settings", MODE_PRIVATE).getBoolean("unfinished-run", false) ? "The previous run was interrupted. Use the saved chain to recover; no new snapshot is required. Automatic recovery will retry a saved run." : v.detail);
         android.os.PowerManager power=getSystemService(android.os.PowerManager.class);
         boolean unrestricted=power.isIgnoringBatteryOptimizations(getPackageName());
         String reason=getSharedPreferences("settings",MODE_PRIVATE).getString("last-run-reason","");
@@ -207,7 +213,10 @@ public final class MainActivity extends Activity {
         metrics.setText((selectedSample ? (v.active ? "Block " : "Last observed block ") + String.format(java.util.Locale.ROOT, "%,d", v.height)
             + "  ·  Irreversible " + String.format(java.util.Locale.ROOT, "%,d", v.lib) : "Block waiting  ·  Irreversible waiting")
             + "\nPeers " + (!network.equals(v.network) || v.peers < 0 ? "waiting" : v.peers) + "  ·  " + freeLabel);
-        next.setText(v.active ? v.readiness : "Next: " + (engineAvailable ? "choose chain storage in step 1, then download a snapshot in step 2. Or use Start observer to sync from genesis on " + label() + "." : "a complete Android engine build is required. This APK cannot run a node yet."));
+        boolean existingChain=NodeStorage.hasChain(this,network),recoverableChain=NodeStorage.hasRecoverableChain(this,network);
+        next.setText(v.active?v.readiness:existingChain?"Next: Start observer to use your existing chain and catch up. No new snapshot or backup cleanup is required."
+            :recoverableChain?"Next: Find existing chain data in step 2. Your files may still be here; do not delete them or download again yet."
+            :"Next: "+(engineAvailable?"choose chain storage, then review a snapshot in step 2, or Start observer to sync normally on "+label()+".":"Install a complete node engine."));
         engineText.setText(Build.MANUFACTURER + " " + Build.MODEL + " · Android " + Build.VERSION.RELEASE + "\n"
             + String.format(java.util.Locale.ROOT, "%.1f GiB RAM · ", memory.totalMem / 1073741824.0) + freeLabel
             + "\n" + (arm ? "ARM64 is supported by this app." : "This app requires a 64-bit ARM Android installation.")
@@ -221,6 +230,8 @@ public final class MainActivity extends Activity {
         storageButton.setEnabled(!v.active&&!v.busy&&!keyBusy&&!snapshotBusy&&!savedDownload);
         SnapshotSetup setup=snapshotSetup(v,free,storageProblem);
         downloadChain.setText(setup.label);downloadChain.setEnabled(setup.enabled());
+        findChain.setEnabled(!v.active&&!v.busy&&!snapshotBusy&&!findingChain);findChain.setText(findingChain?"Looking for existing chain data…":"Find existing chain data…");
+        replaceChain.setVisibility(existingChain?View.VISIBLE:View.GONE);replaceChain.setEnabled(!v.busy&&!snapshotBusy&&!findingChain);
         snapshotSetupText.setText("Network: "+label()+"\n"+setup.note);
         discardDownload.setVisibility(savedDownload?View.VISIBLE:View.GONE);discardDownload.setEnabled(!v.active&&!v.busy&&!snapshotBusy);
         boolean liveDownload=v.downloading&&network.equals(v.network);
@@ -284,15 +295,26 @@ public final class MainActivity extends Activity {
         s.engine=engineAvailable;s.arm64=Arrays.asList(Build.SUPPORTED_64_BIT_ABIS).contains("arm64-v8a");
         s.active=v.active;s.busy=v.busy;s.phase=v.phase;s.downloading=v.downloading;
         s.checking=snapshotBusy;s.keyBusy=keyBusy;s.free=free;s.storageProblem=storageProblem==null?"":storageProblem;
+        s.existing=NodeStorage.hasChain(this,network);s.recoverable=NodeStorage.hasRecoverableChain(this,network);
         s.saved=SnapshotBootstrap.pending(this,network);s.retained=NodeStorage.retained(this,network);s.validated=NodeStorage.canClean(this,network);
         return SnapshotSetup.from(s);
     }
-    private void reviewSnapshot() {
+    private void reviewSnapshot(){reviewSnapshot(false);}
+    private void reviewSnapshot(boolean replace) {
         long availableBytes=-1;String storageProblem="";
         try{availableBytes=NodeStorage.free(this,network);}catch(Exception e){storageProblem=e.getMessage();}
         SnapshotSetup setup=snapshotSetup(NodeService.snapshot(),availableBytes,storageProblem);
+        if(replace){
+            SnapshotSetup.State override=new SnapshotSetup.State();NodeService.ViewState v=NodeService.snapshot();
+            override.engine=engineAvailable;override.arm64=Arrays.asList(Build.SUPPORTED_64_BIT_ABIS).contains("arm64-v8a");override.free=availableBytes;override.storageProblem=storageProblem;
+            override.active=v.active;override.busy=v.busy;override.checking=snapshotBusy;override.keyBusy=keyBusy;override.saved=SnapshotBootstrap.pending(this,network);
+            override.retained=NodeStorage.retained(this,network);override.validated=NodeStorage.canClean(this,network);override.replace=true;setup=SnapshotSetup.from(override);
+        }
+        if(setup.action==SnapshotSetup.Action.USE_EXISTING){if(NodeService.isActive())message("Existing chain is in use",setup.note);else runNode(NodeService.OBSERVER);return;}
+        if(setup.action==SnapshotSetup.Action.FIND_EXISTING){findExistingChain();return;}
+        final String setupNote=setup.note;
         if(setup.action==SnapshotSetup.Action.STOP_NODE) {
-            new AlertDialog.Builder(this).setTitle("Stop the node for snapshot setup?").setMessage(setup.note+"\n\nStopping preserves the current database. You will review the snapshot and its size before any download starts.")
+            new AlertDialog.Builder(this).setTitle("Stop the node for snapshot setup?").setMessage(setupNote+"\n\nStopping preserves the current database. You will review the snapshot and its size before any download starts.")
                 .setNegativeButton("Keep running",null).setPositiveButton("Stop node",(d,w)->send(NodeService.STOP)).show();return;
         }
         if(setup.action==SnapshotSetup.Action.CLEAN_PREVIOUS){cleanStorage();return;}
@@ -301,29 +323,58 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Not now",null).setPositiveButton("Start observer",(d,w)->runNode(NodeService.OBSERVER)).show();return;
         }
         if(setup.action!=SnapshotSetup.Action.REVIEW){message("Snapshot setup",setup.note);return;}
-        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},11);return;}
+        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){notificationSnapshotReplace=replace;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},11);return;}
         final String chosen=network;final String selected=NodeStorage.volume(this,chosen);snapshotBusy=true;refresh();
         work.execute(()->{
             try {
-                SnapshotPlan plan=SnapshotBootstrap.review(this,chosen);long free=NodeStorage.free(this,chosen);boolean resume=SnapshotBootstrap.pending(this,chosen);
+                SnapshotPlan plan=SnapshotBootstrap.review(this,chosen);long free=NodeStorage.free(this,chosen);boolean resume=SnapshotBootstrap.pending(this,chosen);long remaining=SnapshotBootstrap.estimatedRemaining(this,chosen,plan);
                 handler.post(()->{
                     snapshotBusy=false;if(isFinishing()||isDestroyed())return;refresh();
                     if(NodeService.isActive()||!chosen.equals(network)||!selected.equals(NodeStorage.volume(this,chosen)))return;
                     String info="Network: "+label()+"\nStorage: "+NodeStorage.label(this,chosen)+"\nSnapshot: "+plan.created
                         +(plan.head>0?"\nStarting block: "+String.format(java.util.Locale.ROOT,"%,d",plan.head):"")
-                        +"\nChain files: "+SnapshotDownload.gib(plan.bytes)+" GiB\nFree space: "+SnapshotDownload.gib(free)+" GiB\n"
+                        +"\nFull snapshot download: "+DataUse.size(plan.bytes)+(resume?"\nEstimated remaining download: "+DataUse.size(remaining):"")+"\nFree space: "+SnapshotDownload.gib(free)+" GiB\n"
                         +(resume?"Verified files are reused. Remaining space is checked before downloading more.":"Requires "+SnapshotDownload.gib(plan.bytes+SnapshotPlan.RESERVE)+" GiB free, including a 2 GiB reserve. Existing chain data stays in place.")
                         +"\n\nThis uses the Foundation's published chain state, then validates new blocks locally. Every downloaded file is checked against its published SHA-256 checksum. Your existing chain is kept until the restored observer advances. Wallet keys and configuration are preserved. Production stays off.";
                     AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle(resume?"Resume this chain download?":"Download and sync the chain?").setMessage(info).setNegativeButton("Not now",null);
                     if(resume||free>=plan.bytes+SnapshotPlan.RESERVE)dialog.setPositiveButton(resume?"Resume":"Download and sync",(d,w)->{
                         if(NodeService.isActive()||!chosen.equals(network)||!selected.equals(NodeStorage.volume(this,chosen)))return;
-                        startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.DOWNLOAD_CHAIN).putExtra("network",chosen).putExtra("snapshot_id",plan.id).putExtra("manifest_hash",plan.manifestHash).putExtra("files_hash",plan.filesHash));
+                        if(NetworkPolicy.needsConsent(this))showMobileDownloadReview(plan,remaining,()->startSnapshotDownload(chosen,selected,plan,true));
+                        else startSnapshotDownload(chosen,selected,plan,false);
                     });
                     else dialog.setNeutralButton("Free up storage first",(d,w)->{});
                     dialog.show();
                 });
             }catch(Exception e){handler.post(()->{snapshotBusy=false;if(!isFinishing()&&!isDestroyed()){getSharedPreferences("settings",MODE_PRIVATE).edit().putString("snapshot-status-"+chosen,"Snapshot check failed: "+e.getMessage()+"\nExisting chain data was preserved. Follow the message above before retrying.").apply();refresh();}});}
         });
+    }
+    private void startSnapshotDownload(String chosen,String selected,SnapshotPlan plan,boolean allowMobile) {
+        if(NodeService.isActive()||!chosen.equals(network)||!selected.equals(NodeStorage.volume(this,chosen)))return;
+        startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.DOWNLOAD_CHAIN).putExtra("network",chosen)
+            .putExtra("snapshot_id",plan.id).putExtra("manifest_hash",plan.manifestHash).putExtra("files_hash",plan.filesHash).putExtra("allow_mobile_download",allowMobile));
+    }
+    void showMobileDownloadReview(SnapshotPlan plan,long remaining,Runnable approved) {
+        new AlertDialog.Builder(this).setTitle("Download this chain over mobile data?")
+            .setMessage(DataUse.warning(plan.bytes,remaining)).setNegativeButton("Cancel",null)
+            .setPositiveButton("Download using mobile data",(d,w)->approved.run()).show();
+    }
+    private void findExistingChain() {
+        if(NodeService.isActive()||findingChain)return;final String chosen=network;findingChain=true;refresh();
+        work.execute(()->{try {
+            java.util.List<NodeStorage.Existing> found=NodeStorage.findExisting(this,chosen);
+            handler.post(()->{findingChain=false;if(isDestroyed())return;refresh();if(NodeService.isActive()||!chosen.equals(network))return;
+                if(found.isEmpty()){message("No complete saved chain was found","No complete database was found in this app's phone or currently mounted SD-card locations. No files were deleted. If the old data is on an unmounted card, insert that card and search again. Keep any chain folders you can see; do not clear app data.");return;}
+                String[] labels=new String[found.size()];for(int i=0;i<labels.length;i++)labels[i]=found.get(i).description();
+                new AlertDialog.Builder(this).setTitle("Choose existing chain · "+label()).setItems(labels,(d,index)->{
+                    NodeStorage.Existing item=found.get(index);
+                    new AlertDialog.Builder(this).setTitle("Reconnect this existing chain?").setMessage(item.description()+"\n\nOnly the saved storage selection and database links will be repaired. Database files, backups and signing keys are kept. The observer will verify the selected network before production; no snapshot is downloaded.")
+                        .setNegativeButton("Cancel",null).setPositiveButton("Use this existing chain",(dialog,w)->{
+                            if(NodeService.isActive()||!chosen.equals(network))return;
+                            startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.RECONNECT_STORAGE).putExtra("network",chosen).putExtra("volume",item.volume).putExtra("generation",item.generation));
+                        }).show();
+                }).setNegativeButton("Cancel",null).show();
+            });
+        }catch(Exception e){handler.post(()->{findingChain=false;if(!isDestroyed()){refresh();message("Existing chain search",e.getMessage());}});}});
     }
     private void changeStorage() {
         if(NodeService.isActive())return;
@@ -343,19 +394,26 @@ public final class MainActivity extends Activity {
             }).setNegativeButton("Done",null).show();
         }catch(Exception e){message("Storage unavailable","Android could not inspect the card. Reinsert it and try again. Existing chain data was preserved.");}
     }
-    private void cleanStorage(){new AlertDialog.Builder(this).setTitle("Remove the previous database copy?")
-        .setMessage("The observer has advanced on the selected storage. This permanently removes only the retained old database to free space. The current database, wallet connection and signing keys are kept.")
-        .setNegativeButton("Keep copy",null).setPositiveButton("Remove previous copy",(d,w)->{if(!NodeService.isActive())send(NodeService.CLEAN_STORAGE);}).show();}
+    private void cleanStorage(){new AlertDialog.Builder(this).setTitle("Delete the previous backup to free space?")
+        .setMessage("This cleanup is OPTIONAL. It is never required to start your existing node. The observer has advanced on the selected storage. This permanently removes only the retained previous backup; the current chain, wallet connection and signing keys are kept.")
+        .setNegativeButton("Keep copy",null).setPositiveButton("Delete backup",(d,w)->{if(!NodeService.isActive())send(NodeService.CLEAN_STORAGE);}).show();}
     private void runNode(String action) {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 10); return;
+        }
+        if(NodeService.OBSERVER.equals(action)&&NetworkPolicy.needsConsent(this)){
+            new AlertDialog.Builder(this).setTitle("Run this node over mobile data?")
+                .setMessage("The observer and miner continue downloading blocks and exchanging peer data after a snapshot is ready. This ongoing traffic has no fixed total size and can use your data allowance or incur carrier/roaming charges.\n\nAllow mobile or metered data for this node run and its automatic recovery? Stop node ends this permission. Your next manually started run will ask again.")
+                .setNegativeButton("Cancel",null).setPositiveButton("Allow data for this run",(d,w)->{
+                    if(!NodeService.isActive())startForegroundService(new Intent(this,NodeService.class).setAction(action).putExtra("network",network).putExtra("allow_mobile_run",true));
+                }).show();return;
         }
         send(action);
     }
     @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(request, permissions, results);
         if(request==11) {
-            if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)reviewSnapshot();
+            if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)reviewSnapshot(notificationSnapshotReplace);
             else {
                 getSharedPreferences("settings",MODE_PRIVATE).edit().putString("snapshot-status-"+network,"Notifications are required for download progress and the stop control. Enable Teleno notifications in Android settings, then tap Download chain snapshot again.").apply();refresh();
                 new AlertDialog.Builder(this).setTitle("Enable download notifications").setMessage("Allow Teleno notifications so download progress and the stop control remain visible. Return here afterward and tap Download chain snapshot.")

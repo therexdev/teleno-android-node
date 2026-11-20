@@ -18,7 +18,7 @@ import java.util.regex.*;
 
 public final class NodeService extends Service {
     static final String OBSERVER = "observer", PRODUCER = "producer", STOP = "stop", FORCE = "force";
-    static final String RECOVER="recover";
+    static final String RECOVER="recover", RECONNECT_STORAGE="reconnect-storage";
     static final String MOVE_STORAGE = "move-storage", CLEAN_STORAGE = "clean-storage";
     static final String DOWNLOAD_CHAIN="download-chain", DISCARD_DOWNLOAD="discard-download";
     static final String REVIEWED="production-reviewed", REVIEW_ACCOUNT="reviewed-account", REVIEW_KEY="reviewed-public-key";
@@ -60,6 +60,7 @@ public final class NodeService extends Service {
     private int readFailures;
     private final RecoveryPolicy recovery=new RecoveryPolicy();
     private volatile boolean wanted, recovering, shuttingDown;
+    private volatile boolean runMobile;
     private final Object runLock=new Object();
     private volatile ProductionReview resumeReview;
     private volatile long retryAt;
@@ -79,7 +80,7 @@ public final class NodeService extends Service {
         SharedPreferences.Editor e=getSharedPreferences("settings",MODE_PRIVATE).edit();
         if(resumeReview==null&&review!=null)e.putLong("production-run-at",0);
         if(review==null)e.putLong("production-run-at",0);
-        e.putBoolean("run-wanted",true).putString("run-network",network).putString("run-mode",review==null?OBSERVER:PRODUCER);
+        e.putBoolean("run-wanted",true).putBoolean("run-mobile",runMobile).putString("run-network",network).putString("run-mode",review==null?OBSERVER:PRODUCER);
         if(review!=null)e.putString("run-account",review.account).putString("run-public-key",LocalRpc.b64(new KeyVault(this,network).publicKey()));
         else e.remove("run-account").remove("run-public-key");
         if(!e.commit())throw new IOException("Could not save automatic recovery settings. Try starting again.");
@@ -87,12 +88,12 @@ public final class NodeService extends Service {
         }
     }
     private void forgetRun() {
-        wanted=false;resumeReview=null;retryAt=0;
-        getSharedPreferences("settings",MODE_PRIVATE).edit().putBoolean("run-wanted",false).commit();
+        wanted=false;resumeReview=null;retryAt=0;runMobile=false;
+        getSharedPreferences("settings",MODE_PRIVATE).edit().putBoolean("run-wanted",false).putBoolean("run-mobile",false).commit();
     }
     private void restoreRun() throws Exception {
         SharedPreferences p=getSharedPreferences("settings",MODE_PRIVATE);
-        wanted=p.getBoolean("run-wanted",false);if(!wanted)return;
+        wanted=p.getBoolean("run-wanted",false);runMobile=p.getBoolean("run-mobile",false);if(!wanted)return;
         String savedNetwork=p.getString("run-network","");NodeConfig.checkNetwork(savedNetwork);
         if(!savedNetwork.equals(p.getString("network","harbinger")))throw new ContextChanged("The selected network changed. Review and start the node again.");
         network=savedNetwork;
@@ -189,7 +190,7 @@ public final class NodeService extends Service {
             return START_STICKY;
         }
         String action = intent.getAction();
-        if (!Arrays.asList(OBSERVER, PRODUCER, STOP, FORCE, MOVE_STORAGE, CLEAN_STORAGE,DOWNLOAD_CHAIN,DISCARD_DOWNLOAD).contains(action)) return START_NOT_STICKY;
+        if (!Arrays.asList(OBSERVER, PRODUCER, STOP, FORCE, MOVE_STORAGE, CLEAN_STORAGE,DOWNLOAD_CHAIN,DISCARD_DOWNLOAD,RECONNECT_STORAGE).contains(action)) return START_NOT_STICKY;
         foreground("Preparing local node");
         if (STOP.equals(action) || FORCE.equals(action)) {
             synchronized(runLock){epoch.incrementAndGet();stopRequested=true;forgetRun();}
@@ -201,24 +202,25 @@ public final class NodeService extends Service {
         }
         synchronized (LOCK) {
             if (VIEW.busy || PRODUCER.equals(mode) || (OBSERVER.equals(action) && process != null)) return wanted?START_STICKY:START_NOT_STICKY;
-            if ((MOVE_STORAGE.equals(action) || CLEAN_STORAGE.equals(action)||DOWNLOAD_CHAIN.equals(action)||DISCARD_DOWNLOAD.equals(action)) && process != null) return START_NOT_STICKY;
+            if ((MOVE_STORAGE.equals(action) || CLEAN_STORAGE.equals(action)||DOWNLOAD_CHAIN.equals(action)||DISCARD_DOWNLOAD.equals(action)||RECONNECT_STORAGE.equals(action)) && process != null) return START_NOT_STICKY;
             VIEW.busy = true;
             if (PRODUCER.equals(action)) VIEW.productionProblem = "";
         }
         long request = epoch.incrementAndGet(); stopRequested = false;shuttingDown=false; stopReason = null;
         String chosen = intent.getStringExtra("network");
+        if(OBSERVER.equals(action))runMobile=intent.getBooleanExtra("allow_mobile_run",false);
         commands.execute(() -> {
             try {
                 NodeConfig.checkNetwork(chosen);
                 if(DOWNLOAD_CHAIN.equals(action)) {
-                    network=chosen;requireEnvironment(false);verifyEngine(false);
+                    network=chosen;final boolean mobile=intent.getBooleanExtra("allow_mobile_download",false);requireEnvironment(false,mobile);verifyEngine(false);
                     wake.acquire(10*60*1000L);wakeAt=System.currentTimeMillis();
                     synchronized(LOCK){VIEW.downloading=true;VIEW.downloadPercent=-1;}
                     final long[] clock={0,0,System.currentTimeMillis(),0,0};final String[] previous={""};final double[] speed={0};
-                    SnapshotBootstrap.run(this,chosen,intent.getStringExtra("snapshot_id"),intent.getStringExtra("manifest_hash"),intent.getStringExtra("files_hash"),(phase,done,total,files,count)->{
+                    SnapshotBootstrap.run(this,chosen,intent.getStringExtra("snapshot_id"),intent.getStringExtra("manifest_hash"),intent.getStringExtra("files_hash"),mobile,(phase,done,total,files,count)->{
                         if(epoch.get()!=request||stopRequested)throw new IOException("Download paused by you.");
                         long now=System.currentTimeMillis();
-                        if(now-clock[1]>5000){requireEnvironment(false);clock[1]=now;}
+                        if(now-clock[1]>5000){requireEnvironment(false,mobile);clock[1]=now;}
                         if(now-wakeAt>5*60*1000L){wake.acquire(10*60*1000L);wakeAt=now;}
                         if(now-clock[0]>700||!phase.equals(previous[0])) {
                             if("Downloading chain snapshot".equals(phase)&&phase.equals(previous[0])&&done>=clock[3]&&now>clock[2]) {
@@ -228,7 +230,7 @@ public final class NodeService extends Service {
                             int percent=total==0?-1:(int)Math.min(100,done*100.0/total);
                             String detail=total==0?"Checking the exact snapshot and selected storage.":SnapshotDownload.gib(done)+" / "+SnapshotDownload.gib(total)+" GiB · "+percent+"%\n"+files+" / "+count+" files verified";
                             if(speed[0]>1024){long seconds=(long)((total-done)/speed[0]);detail+=String.format(Locale.ROOT,"\n%.1f MiB/s · about %d min remaining",speed[0]/1048576.0,Math.max(1,(seconds+59)/60));}
-                            detail+="\nStorage: "+NodeStorage.label(this,chosen)+". Keep Wi-Fi connected and the card inserted.";
+                            detail+="\nStorage: "+NodeStorage.label(this,chosen)+". Keep your connection available and the selected storage inserted.";
                             synchronized(LOCK){VIEW.downloadPercent=percent;}
                             status(phase,detail);
                             if(now-clock[4]>5000||percent==100){saveDownload(phase+"\n"+detail,percent);clock[4]=now;}
@@ -236,7 +238,17 @@ public final class NodeService extends Service {
                     });
                     saveDownload("Snapshot restored and verified. The observer will validate new blocks and catch up; production stays off.",100);
                     synchronized(LOCK){VIEW.downloading=false;}
-                    if(epoch.get()==request&&!stopRequested){requireEnvironment(false);rememberRun(null,request);launch(false,null,request);}
+                    if(epoch.get()==request&&!stopRequested){
+                        if(NetworkPolicy.needsConsent(this)){
+                            saveDownload("Chain snapshot restored and verified. No new download is needed. Tap Start observer to review ongoing mobile data use, or connect Wi-Fi.",100);
+                            status("Chain ready","The existing chain is ready. Start observer to catch up; mobile node traffic requires a separate confirmation.");
+                        }else {requireEnvironment(false);rememberRun(null,request);launch(false,null,request);}
+                    }
+                } else if(RECONNECT_STORAGE.equals(action)) {
+                    network=chosen;status("Reconnecting existing chain","Checking the saved database and reconnecting it without deleting files or downloading a snapshot.");
+                    NodeStorage.reconnect(this,chosen,intent.getStringExtra("volume"),intent.getStringExtra("generation"));
+                    SnapshotBootstrap.finishCompleted(this,chosen);
+                    status("Existing chain reconnected","Your saved chain is selected. Start the observer to catch up; no full snapshot download is needed.");
                 } else if(DISCARD_DOWNLOAD.equals(action)) {
                     network=chosen;status("Removing unfinished download","Removing only the inactive download. The current chain and signing keys are preserved.");
                     SnapshotBootstrap.discard(this,chosen);saveDownload("Unfinished download removed. You can check for the latest snapshot or sync from genesis.",-1);
@@ -260,7 +272,7 @@ public final class NodeService extends Service {
                     }
                 } else if (PRODUCER.equals(action)) startProducer(request, chosen,
                     new ProductionReview(intent.getBooleanExtra(REVIEWED, false), chosen, intent.getStringExtra(REVIEW_ACCOUNT), intent.getByteArrayExtra(REVIEW_KEY)));
-                else { network = chosen;if(SnapshotBootstrap.pending(this,chosen))throw new IOException("Resume or discard the unfinished snapshot download before starting the observer.");requireEnvironment(false); verifyEngine(false); rememberRun(null,request); launch(false, null, request); }
+                else { network = chosen;SnapshotBootstrap.finishCompleted(this,chosen);if(SnapshotBootstrap.pending(this,chosen))throw new IOException("Resume or discard the unfinished snapshot download before starting the observer.");requireEnvironment(false); verifyEngine(false); rememberRun(null,request); launch(false, null, request); }
             } catch (Exception | LinkageError e) {
                 if (PRODUCER.equals(action)) synchronized (LOCK) { VIEW.productionProblemNetwork = chosen; VIEW.productionProblem = e.getMessage() == null ? "Production did not start. Review the current node status and try again." : e.getMessage(); }
                 if(DOWNLOAD_CHAIN.equals(action)) {
@@ -289,7 +301,8 @@ public final class NodeService extends Service {
             if (!hex.toString().equals(artifacts.getString(name))) throw new IllegalStateException("The installed node failed its integrity check. Reinstall a complete APK.");
         }
     }
-    private void requireEnvironment(boolean producer) throws Exception {
+    private void requireEnvironment(boolean producer)throws Exception {requireEnvironment(producer,runMobile);}
+    private void requireEnvironment(boolean producer,boolean allowMobile) throws Exception {
         NotificationManager notices = getSystemService(NotificationManager.class);
         NotificationChannel channel = notices.getNotificationChannel(CHANNEL);
         if (!notices.areNotificationsEnabled() || channel == null || channel.getImportance() == NotificationManager.IMPORTANCE_NONE) throw new IllegalStateException("Enable Teleno's local-node notifications in Android settings before starting.");
@@ -306,7 +319,8 @@ public final class NodeService extends Service {
         }
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
-        if (nc == null || !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) || !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) throw new Disconnected();
+        if (nc == null || !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) throw new Disconnected();
+        if(NetworkPolicy.costly(nc)&&!allowMobile)throw new Pause("Mobile or metered data needs your approval. Reconnect Wi-Fi, or Stop node and Start observer to review mobile data use.");
     }
     private void startProducer(long request, String chosen, ProductionReview review) throws Exception {
         if (!OBSERVER.equals(mode) || process == null || !process.isAlive() || !chosen.equals(network)) throw new IllegalStateException("Run an observer on this network before enabling production.");
@@ -475,7 +489,7 @@ public final class NodeService extends Service {
             try {requireEnvironment(PRODUCER.equals(mode));}
             catch(Disconnected e) {
                 // Connectivity loss alone should not tear down a healthy native process.
-                synchronized(LOCK){VIEW.ready=false;VIEW.readiness="Waiting for unmetered Wi-Fi to reconnect.";}
+                synchronized(LOCK){VIEW.ready=false;VIEW.readiness="Waiting for the approved network connection to return.";}
                 status("Reconnecting network","The node remains open and will reconnect automatically. Stop node cancels the run.");return;
             }
             LocalRpc rpc=new LocalRpc();boolean matches;JSONObject head;

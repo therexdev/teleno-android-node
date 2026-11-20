@@ -21,6 +21,8 @@ java -jar "$TELENO_ECJ" -17 -nowarn -cp "$TELENO_JSON_JAR" -d "$TEST_DIR/classes
   "$ROOT/app/src/main/java/com/koinos/teleno/NativeKeys.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/NativeFiles.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/StorageFiles.java" \
+  "$ROOT/app/src/main/java/com/koinos/teleno/ChainData.java" \
+  "$ROOT/app/src/main/java/com/koinos/teleno/DataUse.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/StorageLinks.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/VaultClient.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/ProductionPermission.java" \
@@ -48,7 +50,8 @@ java -jar "$TELENO_ECJ" -17 -nowarn -cp "$TELENO_JSON_JAR" -d "$TEST_DIR/classes
   "$ROOT/tests/java/com/koinos/teleno/DashboardTests.java" \
   "$ROOT/tests/java/com/koinos/teleno/ProductionSetupTests.java" \
   "$ROOT/tests/java/com/koinos/teleno/StartupPortsTests.java" \
-  "$ROOT/tests/java/com/koinos/teleno/BurnRecoveryTests.java"
+  "$ROOT/tests/java/com/koinos/teleno/BurnRecoveryTests.java" \
+  "$ROOT/tests/java/com/koinos/teleno/DataStorageTests.java"
 java -Djava.library.path="$TEST_DIR" -cp "$TEST_DIR/classes" com.koinos.teleno.CoreTests
 java -Djava.library.path="$TEST_DIR" -cp "$TEST_DIR/classes" com.koinos.teleno.StorageTests "$TEST_DIR/teleno_runner"
 java -cp "$TEST_DIR/classes:$TELENO_JSON_JAR" com.koinos.teleno.VaultTests
@@ -61,6 +64,7 @@ java -cp "$TEST_DIR/classes" com.koinos.teleno.EngineLogTests
 java -cp "$TEST_DIR/classes:$TELENO_JSON_JAR" com.koinos.teleno.DashboardTests
 java -cp "$TEST_DIR/classes" com.koinos.teleno.ProductionSetupTests
 java -cp "$TEST_DIR/classes:$TELENO_JSON_JAR" com.koinos.teleno.BurnRecoveryTests "$TEST_DIR/burn-vectors.json"
+java -cp "$TEST_DIR/classes:$TELENO_JSON_JAR" com.koinos.teleno.DataStorageTests
 java -cp "$TEST_DIR/classes" com.koinos.teleno.StartupPortsTests
 c++ -std=c++17 -Wall -Wextra -Werror "$ROOT/tests/pipe_key_reader.cpp" -o "$TEST_DIR/pipe_key_reader"
 python3 "$ROOT/tests/test_runner.py" "$TEST_DIR/teleno_runner" "$TEST_DIR/pipe_key_reader"

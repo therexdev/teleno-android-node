@@ -6,46 +6,38 @@ chain snapshot downloads and reward history. Docker, WSL and root are not requir
 
 ## Download
 
-**Latest version: 0.3.9 (build 17), with automatic mining recovery and KOIN-to-VHP burns.**
+Published download: [Teleno Node 0.3.8 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8.apk).
 
-- [Download Teleno Node 0.3.9 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.9/Teleno-Node-0.3.9.apk)
-- [Download the matching 0.3.9 source archive](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.9/Teleno-Node-0.3.9-source.zip)
-- [SHA-256 checksums](releases/0.3.9/SHA256SUMS.txt)
-- [0.3.9 release notes and setup instructions](releases/0.3.9/RELEASE_NOTES.md)
+**Prepared update: 0.3.10 (build 18)** adds mobile-data downloads, existing-chain
+recovery and clearer setup, alongside the mining recovery and wallet burns from
+prepared version 0.3.9. Its signed APK, source and checksums are supplied separately
+in ChatGPT while physical-device validation is pending. The source changes are in
+[draft PR #1](https://github.com/therexdev/teleno-android-node/pull/1); a 0.3.10
+binary release has not been published to GitHub.
 
-The APK and matching source are committed in this repository under
-[`releases/0.3.9`](releases/0.3.9). The links above download version 0.3.9 directly.
-The unchanged native engine can be rebuilt using the
+Requires **Android 9 or newer and ARM64**. Stop the node and install the update
+over the existing app; do not uninstall or clear its data. The package remains
+`com.koinos.teleno`, uses version code **18** and retains the same signing certificate.
+
+## What changed in 0.3.10
+
+- Use an existing downloaded chain as the normal next step. A new snapshot is optional.
+- Find and reconnect complete chain data in the app's phone or SD-card locations.
+- Label backup deletion as optional and protect the active chain during cleanup/discard.
+- Show exact snapshot size and estimated remaining data before explicitly approving
+  a mobile or metered download. Wi-Fi-only transfers cannot silently change networks.
+- Ask separately before ongoing mobile-data node synchronization or mining.
+- Keep automatic mining recovery, Silent Mode and explicit KOIN-to-VHP wallet
+  reviews from prepared 0.3.9.
+
+See [0.3.10 setup and recovery instructions](releases/0.3.10/RELEASE_NOTES.md).
+The unchanged native engine can be rebuilt from the
 [0.3.7 native materials](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7-native-materials.zip).
-
-Requires **Android 9 or newer and an ARM64 device**. Chain data requires substantial
-free storage; Setup shows the space required for the selected snapshot. Removable
-storage is offered when Android exposes a suitable app-specific SD-card location.
-
-To update, stop the node and install the APK over the existing app. Version 0.3.9
-uses package `com.koinos.teleno`, version code **17** and the same signing
-certificate as the earlier installers. Keep the existing app and its data.
-
-## What changed in 0.3.9
-
-- Recover a saved user-started run after temporary interruptions, native process
-  exits, Android service recreation and device reboot. Stop node cancels recovery.
-- Keep the process open during Wi-Fi loss; recover sustained RPC, chain and native
-  eligibility-counter stalls through an observer with fresh production checks.
-- Show the last interruption reason and Android background-running settings.
-- Burn an exact KOIN amount to VHP in the selected KOIN Vault wallet and optionally
-  approve its resulting VHP production balance in one explicitly reviewed transaction.
-- Preserve pending burn requests without automatic resubmission; confirm the exact
-  burn against irreversible history.
-- Retain Silent Mode's moving, dim black-screen display from 0.3.8.
-
-See the [release notes](releases/0.3.9/RELEASE_NOTES.md) for setup, recovery behavior
-and the physical-device validation still needed.
 
 ## Use the app
 
-1. In **Setup**, choose the network and storage location.
-2. Download and restore a public chain snapshot, or start an observer to sync normally.
+1. In **Setup**, choose the network and storage location. Reuse an existing chain if present.
+2. Use the saved chain, find an existing database, or review an optional snapshot download.
 3. Connect KOIN Vault and choose the node wallet if you want to produce blocks.
 4. Create or import the device's block-signing key, approve its registration in the
    wallet, and check registration after the observer catches up.
@@ -76,10 +68,10 @@ includes pinned source archives, all 171 link inputs, licenses and instructions
 for relinking with replacement libraries. APK-signing keys and wallet data are
 not distributed.
 
-Release validation covers 26 Robolectric tests, package/version checks, APK
+Release validation covers 39 Robolectric tests, package/version checks, APK
 signature verification, 16 KiB alignment and unchanged native engine hashes.
 No physical Android device, overnight connection test or live burn transaction was available.
-See [validation details](releases/0.3.9/validation.json).
+See [validation details](releases/0.3.10/validation.json).
 
 Publisher certificate SHA-256:
 

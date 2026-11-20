@@ -350,4 +350,123 @@ public class UiSmokeTest {
     assertTrue(text.contains("Burn: 1.23456789 KOIN"));assertTrue(text.contains("2 → 4.23456789 VHP"));assertTrue(text.contains("irreversible"));assertTrue(text.contains(permission.account));
     dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertFalse(dialog.isShowing());controller.pause().stop().destroy();
   }
+
+  @Test public void mobileDataWarningRequiresExplicitDownloadApproval()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();
+    a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    String manifest=Files.readString(Paths.get("tests/fixtures/mainnet-manifest.json")),files=Files.readString(Paths.get("tests/fixtures/mainnet-files.json"));
+    SnapshotPlan plan=new SnapshotPlan("mainnet",new org.json.JSONObject(manifest).getString("backup_id"),manifest,files);int[] started={0};
+    a.showMobileDownloadReview(plan,plan.bytes/2,()->started[0]++);AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+    String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+    assertTrue(text.contains(DataUse.size(plan.bytes)));assertTrue(text.contains(DataUse.size(plan.bytes/2)));assertTrue(text.contains("carrier/roaming charges"));assertTrue(text.contains("does not enable ongoing"));
+    assertEquals(0,started[0]);dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals("Cancel transfers no data",0,started[0]);
+    a.showMobileDownloadReview(plan,plan.bytes,()->started[0]++);dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+    assertEquals("Download using mobile data",dialog.getButton(DialogInterface.BUTTON_POSITIVE).getText().toString());
+    dialog.getButton(DialogInterface.BUTTON_POSITIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(1,started[0]);controller.pause().stop().destroy();
+  }
+  @Test public void cellularAndMeteredWifiAlwaysNeedConsent() {
+    android.net.NetworkCapabilities wifi=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    assertFalse(NetworkPolicy.costly(wifi));wifi.removeCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);assertTrue(NetworkPolicy.costly(wifi));
+    android.net.NetworkCapabilities mobile=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    assertTrue("Even unlimited cellular needs a warning",NetworkPolicy.costly(mobile));
+    android.net.NetworkCapabilities wired=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_ETHERNET).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);assertFalse(NetworkPolicy.costly(wired));
+  }
+  @Test public void snapshotNetworkIsBoundAndMobileIsBlockedWithoutConsent()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();android.net.ConnectivityManager cm=context.getSystemService(android.net.ConnectivityManager.class);
+    org.robolectric.shadows.ShadowConnectivityManager manager=Shadows.shadowOf(cm);
+    manager.setActiveNetworkInfo(org.robolectric.shadows.ShadowNetworkInfo.newInstance(android.net.NetworkInfo.DetailedState.CONNECTED,android.net.ConnectivityManager.TYPE_MOBILE,0,true,true));
+    android.net.Network active=cm.getActiveNetwork();assertNotNull(active);
+    android.net.NetworkCapabilities mobile=new android.net.NetworkCapabilities().addTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    manager.setNetworkCapabilities(active,mobile);
+    try {NetworkPolicy.downloadNetwork(context,false);fail("No mobile request before consent");}catch(IOException expected){assertTrue(expected.getMessage().contains("before using mobile"));}
+    assertSame("Approved transfer uses the checked Android network",active,NetworkPolicy.downloadNetwork(context,true));
+    mobile.removeTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR).addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    manager.setNetworkCapabilities(active,mobile);assertSame(active,NetworkPolicy.downloadNetwork(context,false));
+  }
+  static File savedChain(android.content.Context context,String network,String gen)throws Exception {
+    File folder=new File(context.getNoBackupFilesDir(),"teleno-chain/"+network+"-"+gen);new File(folder,"db").mkdirs();new File(folder,"blockchain").mkdirs();
+    Files.writeString(new File(folder,"storage.id").toPath(),gen);Files.writeString(new File(folder,"db/CURRENT").toPath(),"MANIFEST-000001\n");Files.writeString(new File(folder,"db/MANIFEST-000001").toPath(),"saved chain fixture");return folder;
+  }
+  @Test public void savedPhoneChainIsFoundAfterSelectionWasLost()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="a".repeat(32);File folder=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().clear().commit();assertFalse(NodeStorage.hasChain(context,"mainnet"));assertTrue(NodeStorage.hasRecoverableChain(context,"mainnet"));
+    java.util.List<NodeStorage.Existing> found=NodeStorage.findExisting(context,"mainnet");assertEquals(1,found.size());assertEquals("phone",found.get(0).volume);assertEquals(gen,found.get(0).generation);
+    assertEquals("MANIFEST-000001\n",Files.readString(new File(folder,"db/CURRENT").toPath()));assertTrue(new File(folder,"db/MANIFEST-000001").exists());
+    assertEquals("Searching does not change the saved selection","",NodeStorage.generation(context,"mainnet"));
+  }
+  @Test public void discoveryExcludesUnverifiedDownloadsAndOtherNetworks()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();File incomplete=savedChain(context,"mainnet","b".repeat(32));new File(incomplete,"storage.id").delete();
+    savedChain(context,"harbinger","c".repeat(32));assertTrue(NodeStorage.findExisting(context,"mainnet").isEmpty());
+    assertTrue("Search preserves incomplete files",new File(incomplete,"db/CURRENT").exists());
+  }
+  @Test public void existingChainNextStepDoesNotRequestAnotherSnapshot()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);
+    a.getSharedPreferences("settings",0).edit().clear().putString("network","mainnet").commit();File folder=savedChain(a,"mainnet","d".repeat(32));
+    a.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation","d".repeat(32)).commit();
+    controller.create().start().resume().visible();assertTrue(NodeStorage.hasChain(a,"mainnet"));TextView next=(TextView)getPrivate(a,"next");
+    assertTrue(next.getText().toString().contains("No new snapshot or backup cleanup"));assertTrue(new File(folder,"db/CURRENT").exists());controller.pause().stop().destroy();
+  }
+  @Test public void backupDeletionIsClearlyOptional()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    invokePrivate(a,"cleanStorage",new Class<?>[]{});AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+    assertTrue(text.contains("OPTIONAL"));assertTrue(text.contains("never required to start"));dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();controller.pause().stop().destroy();
+  }
+
+  @org.robolectric.annotation.Implements(value=NativeFiles.class,isInAndroidSdk=false)
+  public static class ShadowOwnership {
+    static final java.util.Map<Integer,RandomAccessFile> handles=new java.util.HashMap<>();static int next=1;
+    @org.robolectric.annotation.Implementation protected static void __staticInitializer__(){}
+    @org.robolectric.annotation.Implementation protected static int lock(String path)throws IOException {
+      RandomAccessFile file=new RandomAccessFile(path,"rw");try{if(file.getChannel().tryLock()==null)throw new IOException("busy");int id=next++;handles.put(id,file);return id;}catch(Exception e){file.close();throw e;}
+    }
+    @org.robolectric.annotation.Implementation protected static void unlock(int id)throws IOException {RandomAccessFile file=handles.remove(id);if(file!=null)file.close();}
+  }
+  /** Robolectric cannot fsync directories; data and link operations still use real host files. */
+  @org.robolectric.annotation.Implements(android.system.Os.class)
+  public static class ShadowDirectorySync {
+    @org.robolectric.annotation.Implementation protected static java.io.FileDescriptor open(String path,int flags,int mode){return new java.io.FileDescriptor();}
+    @org.robolectric.annotation.Implementation protected static void fsync(java.io.FileDescriptor fd){}
+    @org.robolectric.annotation.Implementation protected static void close(java.io.FileDescriptor fd){}
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void reconnectRepairsLostSelectionWithoutChangingTheDatabase()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="e".repeat(32);File folder=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().clear().commit();NodeStorage.reconnect(context,"mainnet","phone",gen);
+    assertEquals(gen,NodeStorage.generation(context,"mainnet"));assertTrue(NodeStorage.hasChain(context,"mainnet"));
+    File link=new File(NodeConfig.root(context,"mainnet"),"db");assertTrue(Files.isSymbolicLink(link.toPath()));assertEquals(new File(folder,"db").toPath(),Files.readSymbolicLink(link.toPath()));
+    assertEquals("saved chain fixture",Files.readString(new File(folder,"db/MANIFEST-000001").toPath()));assertFalse(SnapshotBootstrap.pending(context,"mainnet"));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void updateRepairsMissingLinksForTheSavedGeneration()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="f".repeat(32);File folder=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation",gen).commit();
+    assertFalse(new File(NodeConfig.root(context,"mainnet"),"db").exists());NodeStorage.ensureReady(context,"mainnet");
+    assertTrue(Files.isSymbolicLink(new File(NodeConfig.root(context,"mainnet"),"db").toPath()));assertTrue(new File(folder,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void cleanupDeletesOnlyTheSeparateValidatedBackup()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String active="1".repeat(32),old="2".repeat(32);File current=savedChain(context,"mainnet",active),backup=savedChain(context,"mainnet",old);
+    NodeStorage.reconnect(context,"mainnet","phone",active);
+    String retained=new org.json.JSONObject().put("volume","phone").put("generation",old).put("backup",active).toString();
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-retained",retained).putString("mainnet-validated",active).commit();
+    File keySentinel=new File(context.getNoBackupFilesDir(),"signer-sentinel.gcm");Files.writeString(keySentinel.toPath(),"keep");
+    NodeStorage.clean(context,"mainnet");assertFalse(backup.exists());assertTrue(new File(current,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));assertEquals("keep",Files.readString(keySentinel.toPath()));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void cleanupRefusesUnreadableActiveChainAndPreservesTheBackup()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String active="3".repeat(32),old="4".repeat(32);File current=savedChain(context,"mainnet",active),backup=savedChain(context,"mainnet",old);
+    NodeStorage.reconnect(context,"mainnet","phone",active);
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-retained",new org.json.JSONObject().put("volume","phone").put("generation",old).put("backup",active).toString()).putString("mainnet-validated",active).commit();
+    new File(current,"db/CURRENT").delete();try{NodeStorage.clean(context,"mainnet");fail("No backup deletion when active chain is unreadable");}catch(IOException expected){assertTrue(expected.getMessage().contains("blocked"));}
+    assertTrue(new File(backup,"db/CURRENT").exists());assertTrue(NodeStorage.retained(context,"mainnet"));
+  }
+
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void discardKeepsACompletedChainWhenItsSelectionWasLost()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="5".repeat(32);File saved=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().clear().commit();
+    File record=new File(context.getNoBackupFilesDir(),"chain-download-mainnet.json");Files.writeString(record.toPath(),new org.json.JSONObject().put("volume","phone").put("generation",gen).toString());
+    SnapshotBootstrap.discard(context,"mainnet");assertFalse(SnapshotBootstrap.pending(context,"mainnet"));assertTrue("Published chain is never discarded as a partial download",new File(saved,"db/CURRENT").exists());assertTrue(NodeStorage.hasRecoverableChain(context,"mainnet"));
+  }
+  @Test @Config(shadows={ShadowOwnership.class,ShadowDirectorySync.class}) public void completedRestoreRecordIsReconciledWithoutAnotherDownload()throws Exception {
+    android.content.Context context=RuntimeEnvironment.getApplication();String gen="6".repeat(32);File saved=savedChain(context,"mainnet",gen);
+    context.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation",gen).commit();
+    File record=new File(context.getNoBackupFilesDir(),"chain-download-mainnet.json");Files.writeString(record.toPath(),new org.json.JSONObject().put("volume","phone").put("generation",gen).toString());
+    SnapshotBootstrap.finishCompleted(context,"mainnet");assertFalse(SnapshotBootstrap.pending(context,"mainnet"));assertTrue(new File(saved,"db/CURRENT").exists());assertTrue(NodeStorage.hasChain(context,"mainnet"));
+  }
 }

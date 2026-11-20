@@ -91,7 +91,7 @@ final class NodeShell {
             +"\nSelected wallet: "+(data==null||data.account.isEmpty()?"not selected":data.account)
             +"\nLocal block: "+node.height+"\nIrreversible: "+node.lib+"\nLocal block age: "+age
             +"\nPeers: "+(node.peers<0?"not reported":node.peers)+"\nLocal blocks this run: "+node.localBlocks
-            +"\nChain readiness: "+node.readiness
+            +"\nChain readiness: "+node.readiness+"\n"+NodeStorage.report(activity,node.network)
             +"\nAutomatic recovery requested: "+NodeService.resumeRequested(activity)
             +"\nBattery optimization exempt: "+activity.getSystemService(android.os.PowerManager.class).isIgnoringBatteryOptimizations(activity.getPackageName())
             +"\nLast interruption / stop: "+activity.getSharedPreferences("settings",0).getString("last-run-reason","not recorded")

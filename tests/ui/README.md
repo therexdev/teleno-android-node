@@ -16,7 +16,7 @@ grouped errors and a clipboard report without raw exception text. Permission
 reviews retain their exact amounts and cancellation path. Screenshot-protection
 checks keep normal UI capturable and private key import/export protected.
 
-Twenty-six tests run in total. Compact dashboard checks cover 360×640 portrait,
+Thirty-nine tests run in total. Compact dashboard checks cover 360×640 portrait,
 960×540 Retroid landscape and 640×360 landscape with system-bar insets, alongside
 412×915 portrait, 915×412 landscape and 360×800 at 1.3× text scale. They verify
 non-scrolling Home, the Start/Stop and Silent Mode actions, KOIN above VHP, all nonempty
@@ -65,3 +65,12 @@ Wi-Fi loss without process destruction and exact burn-review cancellation.
 The host Java tests separately cover watchdog deadlines/backoff, exact burn ABI,
 zero balances, mana, stale reviews, irreversible confirmation and unknown-delivery
 recovery without duplicate wallet submission.
+
+The 0.3.10 tests add explicit/cancelled mobile-data consent, metered Wi-Fi and
+unlimited-cellular classification, checked-network binding, saved phone-chain
+discovery, network/incomplete-download exclusion, existing-chain next actions,
+optional cleanup text, lost-selection reconnection, missing-link repair,
+separate-backup deletion, active-chain protection and stale completed-download
+record handling. Storage integration uses real host files/symlinks and test
+shadows for ownership locks and directory fsync; physical Android durability
+still needs device validation.
