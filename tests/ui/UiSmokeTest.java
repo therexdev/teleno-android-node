@@ -1,4 +1,6 @@
 package com.koinos.teleno;
+import java.lang.Process;
+import android.app.Service;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.robolectric.*;
@@ -263,4 +265,89 @@ public class UiSmokeTest {
     v.runAccount="another-account";data.run(v);assertEquals(0,data.runStartedAt);v.runAccount=data.account;v.runNetwork="harbinger";data.run(v);assertEquals(0,data.runStartedAt);
   }
 
+
+  static void setPrivate(Object object,String name,Object value)throws Exception {java.lang.reflect.Field f=object.getClass().getDeclaredField(name);f.setAccessible(true);f.set(object,value);}
+  static Object getPrivate(Object object,String name)throws Exception {java.lang.reflect.Field f=object.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(object);}
+  static Object invokePrivate(Object object,String name,Class<?>[] types,Object... args)throws Exception {java.lang.reflect.Method m=object.getClass().getDeclaredMethod(name,types);m.setAccessible(true);return m.invoke(object,args);}
+  static final class FakeNode extends Process {
+    boolean alive,destroyed;final int exit;
+    FakeNode(boolean alive,int exit){this.alive=alive;this.exit=exit;}
+    public OutputStream getOutputStream(){return new ByteArrayOutputStream();}
+    public InputStream getInputStream(){return new ByteArrayInputStream(new byte[0]);}
+    public InputStream getErrorStream(){return getInputStream();}
+    public int waitFor(){alive=false;return exit;}
+    public int exitValue(){if(alive)throw new IllegalThreadStateException();return exit;}
+    public void destroy(){destroyed=true;alive=false;}
+    public boolean isAlive(){return alive;}
+  }
+  static void drainCommands(NodeService service)throws Exception {
+    ((java.util.concurrent.ExecutorService)getPrivate(service,"commands")).submit(()->{}).get(5,java.util.concurrent.TimeUnit.SECONDS);
+  }
+  @Test public void stickyRecoveryAndStopCancellation()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").putString("run-network","harbinger").putString("run-mode",NodeService.OBSERVER).putBoolean("run-wanted",true).commit();
+      assertEquals(Service.START_STICKY,service.onStartCommand(null,0,1));assertTrue(NodeService.resumeRequested(service));assertTrue((Boolean)getPrivate(service,"recovering"));
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,2);drainCommands(service);
+      assertFalse("Stop persists cancellation before any recovery",NodeService.resumeRequested(service));assertFalse((Boolean)getPrivate(service,"wanted"));
+      assertEquals(Service.START_NOT_STICKY,service.onStartCommand(null,0,3));
+    }finally{controller.destroy();}
+  }
+  @Test public void nativeExitSchedulesRecovery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").commit();
+      invokePrivate(service,"rememberRun",new Class<?>[]{ProductionReview.class,long.class},null,0L);
+      setPrivate(service,"process",new FakeNode(false,137));invokePrivate(service,"poll",new Class<?>[]{});drainCommands(service);
+      assertTrue("Native process exit keeps user's run requested",NodeService.resumeRequested(service));assertTrue((Boolean)getPrivate(service,"recovering"));
+      assertTrue(NodeService.snapshot().detail.contains("137"));assertTrue(NodeService.snapshot().detail.contains("Stop node"));
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,2);drainCommands(service);assertFalse(NodeService.resumeRequested(service));
+    }finally{controller.destroy();}
+  }
+  @Test public void stoppedStartCannotReenableRecovery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,1);drainCommands(service);
+      try{invokePrivate(service,"rememberRun",new Class<?>[]{ProductionReview.class,long.class},null,0L);fail("cancelled start must not be persisted");}
+      catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause() instanceof java.io.InterruptedIOException);}
+      assertFalse(NodeService.resumeRequested(service));
+    }finally{controller.destroy();}
+  }
+  @Test public void changedNetworkCancelsStickyRecovery()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","mainnet").putString("run-network","harbinger").putString("run-mode",NodeService.OBSERVER).putBoolean("run-wanted",true).commit();
+      assertEquals(Service.START_NOT_STICKY,service.onStartCommand(null,0,1));assertFalse(NodeService.resumeRequested(service));
+    }finally{controller.destroy();}
+  }
+  @Test public void wifiDropKeepsNativeProcessOpen()throws Exception {
+    org.robolectric.android.controller.ServiceController<NodeService> controller=Robolectric.buildService(NodeService.class).create();NodeService service=controller.get();
+    ((java.util.concurrent.ScheduledExecutorService)getPrivate(service,"monitor")).shutdownNow();
+    try {
+      service.getSharedPreferences("settings",0).edit().clear().putString("network","harbinger").commit();
+      service.getSharedPreferences("storage",0).edit().clear().commit();
+      org.robolectric.shadows.ShadowStatFs.registerStats(service.getNoBackupFilesDir().getPath(),3000000,2000000,2000000);
+      ActivityManager.MemoryInfo memory=new ActivityManager.MemoryInfo();memory.totalMem=8L*1024*1024*1024;memory.availMem=3L*1024*1024*1024;
+      Shadows.shadowOf(service.getSystemService(ActivityManager.class)).setMemoryInfo(memory);Shadows.shadowOf(service.getSystemService(NotificationManager.class)).setNotificationsEnabled(true);
+      invokePrivate(service,"rememberRun",new Class<?>[]{ProductionReview.class,long.class},null,0L);
+      FakeNode process=new FakeNode(true,0);setPrivate(service,"process",process);setPrivate(service,"mode",NodeService.OBSERVER);
+      invokePrivate(service,"poll",new Class<?>[]{});drainCommands(service);
+      assertFalse("Wi-Fi loss does not destroy the miner",process.destroyed);assertTrue(NodeService.snapshot().phase.contains("Reconnecting"));assertTrue(NodeService.resumeRequested(service));
+      service.onStartCommand(new Intent(service,NodeService.class).setAction(NodeService.STOP),0,2);drainCommands(service);
+    }finally{controller.destroy();}
+  }
+  @Test public void burnReviewShowsExactCombinedTransaction()throws Exception {
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();
+    a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    ProductionPermission.Snapshot permission=new ProductionPermission.Snapshot("1111111111111111111114oLvT2",new java.math.BigInteger("300000000"),new java.math.BigInteger("200000000"),System.currentTimeMillis());
+    BurnKoin.Snapshot snapshot=new BurnKoin.Snapshot(permission,"19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",new java.math.BigInteger("1000000000"),new java.math.BigInteger("500000000"));
+    a.showBurnReview(snapshot,new java.math.BigInteger("123456789"),true);
+    AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+    assertTrue(text.contains("Burn: 1.23456789 KOIN"));assertTrue(text.contains("2 → 4.23456789 VHP"));assertTrue(text.contains("irreversible"));assertTrue(text.contains(permission.account));
+    dialog.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertFalse(dialog.isShowing());controller.pause().stop().destroy();
+  }
 }

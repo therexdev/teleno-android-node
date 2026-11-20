@@ -12,7 +12,7 @@ final class LocalRpc {
     static String b64(byte[] value) { return Base64.encodeToString(value, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING); }
     static byte[] unb64(String value) { return Base64.decode(value.replace('+', '-').replace('/', '_'), Base64.URL_SAFE | Base64.NO_WRAP); }
     JSONObject call(String method, JSONObject params) throws Exception {
-        if (!java.util.Arrays.asList("chain.get_chain_id", "chain.get_head_info", "chain.read_contract", "chain.invoke_system_call", "node.get_status").contains(method)) throw new IllegalArgumentException("Unsupported local check.");
+        if (!java.util.Arrays.asList("chain.get_chain_id", "chain.get_head_info", "chain.read_contract", "chain.invoke_system_call", "node.get_status", "chain.get_account_rc").contains(method)) throw new IllegalArgumentException("Unsupported local check.");
         HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:" + NodeConfig.RPC_PORT + "/").openConnection();
         connection.setConnectTimeout(2500); connection.setReadTimeout(5000); connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod("POST"); connection.setDoOutput(true); connection.setRequestProperty("Content-Type", "application/json");

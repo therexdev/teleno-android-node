@@ -36,6 +36,9 @@ public final class MainActivity extends Activity {
     private TextView storageText, walletStatus, permissionText;
     private Button checkPermission, reviewPermission, revokePermission, dismissPermission;
     private boolean permissionBusy;
+    private TextView burnText,reliabilityText;
+    private Button burnButton,checkBurn,dismissBurn;
+    private boolean burnBusy;
     private ProductionPermission.Snapshot permissionSnapshot;
     private TextView snapshotText, snapshotSetupText;private Button downloadChain,discardDownload;private ProgressBar snapshotProgress;private boolean snapshotBusy;
     private Button storageButton, cleanStorage, connectWallet, openWallet, disconnectWallet, registerWallet, checkWallet, checkRegistration, dismissRegistration;
@@ -58,7 +61,9 @@ public final class MainActivity extends Activity {
         build(); if(saved!=null) { shell.select(saved.getInt("screen",0),false); shell.setup.post(() -> shell.setup.scrollTo(0,saved.getInt("setup-scroll",0)));if(saved.getBoolean("silent-mode",false))silent.enter(); }
         refresh(); walletAction("",c->{},false,false);
     }
-    @Override protected void onResume() { super.onResume(); resumed=true;if(silent!=null)silent.foreground(true); if(shell!=null)shell.foreground(silent==null||!silent.active()); handler.removeCallbacks(tick); handler.post(tick); }
+    @Override protected void onResume() { super.onResume(); resumed=true;if(NodeService.resumeRequested(this)&&!NodeService.isActive()) {
+        try {startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.RECOVER));}catch(RuntimeException e){NodeService.saveReason(this,"Open Setup and Start observer to restore the saved node run.");}
+    }if(silent!=null)silent.foreground(true); if(shell!=null)shell.foreground(silent==null||!silent.active()); handler.removeCallbacks(tick); handler.post(tick); }
     @Override protected void onPause() { resumed=false; handler.removeCallbacks(tick);if(silent!=null)silent.foreground(false); if(shell!=null)shell.foreground(false); super.onPause(); }
     @Override protected void onDestroy() {if(silent!=null)silent.close(); if(dashboard!=null)dashboard.close(); work.shutdown(); productionReviewWork.shutdown(); super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); if(shell!=null){out.putInt("screen",shell.tab);out.putInt("setup-scroll",shell.setup.getScrollY());}if(silent!=null)out.putBoolean("silent-mode",silent.active()); }
@@ -111,6 +116,9 @@ public final class MainActivity extends Activity {
         device.addView(text("Chain data can use a removable SD card. Signing keys and wallet connection details stay protected on the phone. Keep the card inserted while the node runs.",14,MUTED,false));
         button(device, "Android notification settings", () -> startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())));
         device.addView(text("Use unmetered Wi-Fi and leave room for the growing chain. The app stops if storage is low or the device overheats. Block production requires power. No Docker, WSL or root is used.", 14, MUTED, false));
+        reliabilityText=text("",14,MUTED,false);device.addView(reliabilityText);
+        button(device,"Allow unrestricted background running",this::backgroundSettings).setTag("background-running");
+        device.addView(text("Automatic recovery keeps a user-started run active through temporary network or process interruptions and reboots. Stop node cancels it. Android force-stop, a powered-off device, missing storage and overheating still interrupt mining.",14,MUTED,false));
         LinearLayout sync = card("2  ·  Download the chain for faster sync");
         sync.addView(text("Optional: download a native Teleno snapshot from the Koinos Foundation to the storage selected above. Review its size, then download, verify and restore it. An observer starts afterward to catch up. No wallet is needed for this step.", 14, MUTED, false));
         snapshotSetupText=text("",14,INK,true);sync.addView(snapshotSetupText);
@@ -131,7 +139,13 @@ public final class MainActivity extends Activity {
         accountText = text("", 14, INK, true); accountText.setTextIsSelectable(true); wallet.addView(accountText);
         button(wallet,"Wallet balances / data status",()->{if(shell!=null)shell.showWalletDetails();});
         accountButton = button(wallet, "Use another wallet · enter address manually", this::setAccount);
-        wallet.addView(text("To produce, the account needs VHP on the selected network. Burning KOIN for VHP is a separate, irreversible wallet transaction. Verify the network and amount in your wallet; this app does not burn or transfer funds.", 14, MUTED, false));
+        wallet.addView(text("Burn KOIN into VHP at this same wallet address. You can also approve the resulting VHP balance for production in the same wallet transaction. Review the exact amounts here and approve in KOIN Vault; burning is irreversible.",14,MUTED,false));
+        burnText=text("",14,INK,false);wallet.addView(burnText);
+        burnButton=button(wallet,"Burn KOIN → VHP…",this::loadBurn);burnButton.setTag("burn-koin");
+        checkBurn=button(wallet,"Check saved KOIN burn",()->walletAction("KOIN burn status",this::checkBurnHistory,false,true));
+        dismissBurn=button(wallet,"Resolve expired burn request…",()->new AlertDialog.Builder(this).setTitle("Resolve the saved burn request?")
+            .setMessage("First check the exact transaction and pending approvals in KOIN Vault. Closing this saved record does not cancel a burn; a submitted transaction may still complete. Never repeat a burn merely because confirmation is delayed.")
+            .setNegativeButton("Keep request",null).setPositiveButton("I checked the wallet",(d,w)->walletAction("Burn record updated",VaultClient::dismissExpiredBurn,false,true)).show());
         LinearLayout key = card("4  ·  Set up a block-signing key");
         key.addView(text("This is a separate key used by the node to sign blocks. Create one here, or import the existing block-signing WIF from your node. Never enter your wallet recovery phrase.", 14, MUTED, false));
         keyText = text("", 14, INK, true); key.addView(keyText); keyText.setTextIsSelectable(true);
@@ -139,7 +153,7 @@ public final class MainActivity extends Activity {
         registerWallet=button(key,"Register signing key with KOIN Vault",this::registerWithWallet);
         checkRegistration=button(key,"Check registration on this node",this::verifyRegistration);
         dismissRegistration=button(key,"Resolve expired registration…",()->new AlertDialog.Builder(this).setTitle("Resolve an expired registration?")
-            .setMessage("First check KOIN Vault's history and pending approvals. Dismissing this saved request does not cancel a submitted transaction. Only the public-key registration is involved; the app never requests token transfers or burns. Nothing is resent automatically.")
+            .setMessage("First check KOIN Vault's history and pending approvals. Dismissing this saved request does not cancel a submitted transaction. Only the public-key registration is involved in this request. Burn and allowance requests are separate explicit reviews. Nothing is resent automatically.")
             .setNegativeButton("Keep saved request",null).setPositiveButton("I checked the wallet",(d,w)->walletAction("Registration record updated",VaultClient::dismissExpiredRegistration,false,true)).show());
         LinearLayout advanced=new LinearLayout(this);advanced.setOrientation(LinearLayout.VERTICAL);advanced.setVisibility(View.GONE);
         button(key,"Advanced · import an existing signing key",()->advanced.setVisibility(advanced.getVisibility()==View.GONE?View.VISIBLE:View.GONE));key.addView(advanced);
@@ -161,7 +175,7 @@ public final class MainActivity extends Activity {
         production = button(produce, "Review and start block production…", this::reviewProduction);
         button(produce,"Production health / copy report",()->{if(shell!=null)shell.showProductionHealth();}).setTag("production-health");
         if (!productionQualified) produce.addView(text(experimentalProduction
-            ? "Keep the phone powered and cool; use Stop node to stop production. Production never restarts automatically."
+            ? "Keep the phone powered and cool; use Stop node to stop production. Automatic recovery resumes this reviewed producer after fresh observer checks. Stop node cancels recovery."
             : "This app is observer-only. Install the full Teleno Node app to enable block production.", 14, UiKit.AMBER, true));
         LinearLayout activity = card("What's happening"); recent = text("", 14, MUTED, false); activity.addView(recent);
         button(activity, "Open-source notices", this::showNotices);
@@ -181,7 +195,14 @@ public final class MainActivity extends Activity {
         storageText.setText("Chain storage: "+NodeStorage.label(this,network)+"\n"+freeLabel+(storageProblem.isEmpty()?"":"\n"+storageProblem)
             +(NodeStorage.retained(this,network)?"\nPrevious database copy retained. After the new observer advances, stop it and remove that copy to reclaim space.":""));
         ActivityManager.MemoryInfo memory = new ActivityManager.MemoryInfo(); getSystemService(ActivityManager.class).getMemoryInfo(memory);
-        state.setText(v.phase); detail.setText(!v.active && !v.busy && getSharedPreferences("settings", MODE_PRIVATE).getBoolean("unfinished-run", false) ? "The previous run was interrupted. Chain data was preserved. Start an observer to recover; production stays off." : v.detail);
+        state.setText(v.phase); detail.setText(!v.active && !v.busy && getSharedPreferences("settings", MODE_PRIVATE).getBoolean("unfinished-run", false) ? "The previous run was interrupted. Chain data was preserved. Start an observer to recover; automatic recovery will retry the saved run." : v.detail);
+        android.os.PowerManager power=getSystemService(android.os.PowerManager.class);
+        boolean unrestricted=power.isIgnoringBatteryOptimizations(getPackageName());
+        String reason=getSharedPreferences("settings",MODE_PRIVATE).getString("last-run-reason","");
+        long reasonAt=getSharedPreferences("settings",MODE_PRIVATE).getLong("last-run-reason-at",0);
+        reliabilityText.setText("Battery optimization: "+(unrestricted?"unrestricted":"restricted — allow background running below")
+            +"\nAutomatic recovery: "+(NodeService.resumeRequested(this)?"on · Stop node cancels it":"off · enabled when you start the node")
+            +(reason.isEmpty()?"":"\nLast interruption / stop: "+reason+"\n"+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(reasonAt))));
         boolean selectedSample = v.hasSample && network.equals(v.network);
         metrics.setText((selectedSample ? (v.active ? "Block " : "Last observed block ") + String.format(java.util.Locale.ROOT, "%,d", v.height)
             + "  ·  Irreversible " + String.format(java.util.Locale.ROOT, "%,d", v.lib) : "Block waiting  ·  Irreversible waiting")
@@ -226,6 +247,11 @@ public final class MainActivity extends Activity {
         // Review is informational until the separate confirmation action. Never
         // disable it for sync, missing setup or asynchronous wallet polling.
         production.setEnabled(true);
+        boolean pendingBurn=pending&&VaultClient.BURN.equals(wallet.kind);
+        burnButton.setEnabled(!burnBusy&&!permissionBusy&&!pending);
+        checkBurn.setVisibility(wallet!=null&&VaultClient.BURN.equals(wallet.kind)?View.VISIBLE:View.GONE);
+        dismissBurn.setVisibility(pendingBurn?View.VISIBLE:View.GONE);
+        burnText.setText(burnBusy?"Checking the exact KOIN, VHP, mana and PoB allowance…":pendingBurn?"Saved burn: "+WalletReader.amount(wallet.amount)+" KOIN\n"+wallet.note+(wallet.txid.isEmpty()?"":"\nTransaction: "+wallet.txid):"Burns and VHP approvals require your separate wallet approval. They are never repeated automatically.");
         boolean pendingPermission=pending&&VaultClient.ALLOWANCE.equals(wallet.kind);
         checkPermission.setEnabled(!permissionBusy);
         reviewPermission.setEnabled(!permissionBusy);revokePermission.setEnabled(!permissionBusy);
@@ -361,7 +387,7 @@ public final class MainActivity extends Activity {
                 VaultClient.View v=walletClient.view();
                 if(!v.knownAddress.isEmpty())getSharedPreferences("settings",MODE_PRIVATE).edit().putString("vault-producer-mainnet",v.knownAddress).apply();
                 NodeService.ViewState node = NodeService.snapshot();
-                if(v.connected&&!node.busy&&!NodeService.PRODUCER.equals(node.mode)) getSharedPreferences("settings",MODE_PRIVATE).edit().putString("producer-mainnet",v.address).apply();
+                if(v.connected&&!node.busy&&!NodeService.PRODUCER.equals(node.mode)&&!NodeService.resumeRequested(this)) getSharedPreferences("settings",MODE_PRIVATE).edit().putString("producer-mainnet",v.address).apply();
                 walletNotice="";
                 if(notify&&!title.isEmpty())HistoryStore.record(this,"mainnet",title,"KOIN Vault action completed; on-chain confirmation is separate.");
             }catch(Exception e){error=e.getMessage()==null?"Wallet connection unavailable. Saved requests were preserved.":e.getMessage();walletNotice=error;}
@@ -479,6 +505,56 @@ public final class MainActivity extends Activity {
                 ProductionPermission.requireCurrent(snapshot,current,amount,System.currentTimeMillis());
             }),true,true)).show();
     }
+    private void checkBurnHistory(VaultClient client)throws Exception {
+        Exception last=null;
+        for(String endpoint:PublicRpc.endpoints("mainnet"))try {client.checkBurn(new PublicRpc(endpoint));return;}
+        catch(Exception e){last=e;}
+        throw last==null?new IllegalStateException("The burn confirmation could not be checked."):last;
+    }
+    private void backgroundSettings() {
+        try {
+            android.os.PowerManager power=getSystemService(android.os.PowerManager.class);
+            if(!power.isIgnoringBatteryOptimizations(getPackageName()))startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+getPackageName())));
+            else startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));
+        }catch(ActivityNotFoundException e){startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));}
+    }
+    private void loadBurn() {
+        if(burnBusy)return;final String account;
+        try {
+            account=permissionAccount(true);
+            if(walletClient==null||!walletClient.view().connected||!account.equals(walletClient.view().address))throw new IllegalStateException("Connect the producer account to KOIN Vault in step 3 first.");
+            if(walletClient.view().pending)throw new IllegalStateException("Resolve the saved wallet request before preparing a burn.");
+        }catch(Exception e){message("KOIN burn setup",e.getMessage());return;}
+        burnBusy=true;refresh();
+        productionReviewWork.execute(()->{try{
+            LocalRpc rpc=new LocalRpc();BurnKoin.Snapshot snapshot=BurnKoin.read(rpc::call,account,System.currentTimeMillis());
+            if(!account.equals(permissionAccount(true)))throw new IllegalStateException("The selected account changed. Review the burn again.");
+            handler.post(()->{burnBusy=false;if(!isDestroyed()){refresh();chooseBurn(snapshot);}});
+        }catch(Exception e){handler.post(()->{burnBusy=false;if(!isDestroyed()){refresh();message("Burn check unavailable",e.getMessage());}});}});
+    }
+    private void chooseBurn(BurnKoin.Snapshot snapshot) {
+        LinearLayout fields=new LinearLayout(this);fields.setPadding(dp(24),0,dp(24),0);fields.setOrientation(LinearLayout.VERTICAL);
+        EditText amount=new EditText(this);amount.setSingleLine(true);amount.setHint("KOIN amount");amount.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);fields.addView(amount);
+        CheckBox approve=new CheckBox(this);approve.setText("Also approve the resulting VHP balance for production");approve.setChecked(true);fields.addView(approve);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Burn KOIN into VHP")
+            .setMessage("KOIN balance: "+WalletReader.amount(snapshot.koin.toString())+"\nVHP balance: "+WalletReader.amount(snapshot.permission.balance.toString())
+                +"\nMaximum burn now: "+WalletReader.amount(snapshot.maximum().toString())+" KOIN (mana reserve included). Burning cannot be undone.")
+            .setView(fields).setNegativeButton("Cancel",null).setPositiveButton("Review exact transaction",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v->{try{
+            java.math.BigInteger value=BurnKoin.amount(amount.getText().toString().trim());
+            BurnKoin.requireCurrent(snapshot,snapshot,value,approve.isChecked(),System.currentTimeMillis());dialog.dismiss();showBurnReview(snapshot,value,approve.isChecked());
+        }catch(Exception e){amount.setError(e.getMessage());}}));dialog.show();
+    }
+    void showBurnReview(BurnKoin.Snapshot snapshot,java.math.BigInteger amount,boolean approve) {
+        new AlertDialog.Builder(this).setTitle("Review irreversible KOIN burn")
+            .setMessage(BurnKoin.review(snapshot,amount,approve)).setNegativeButton("Cancel",null)
+            .setPositiveButton("Review in KOIN Vault",(d,w)->walletAction("KOIN burn requested",c->c.burnKoin(snapshot,amount,approve,()->{
+                String account=permissionAccount(true);LocalRpc rpc=new LocalRpc();
+                BurnKoin.Snapshot current=BurnKoin.read(rpc::call,account,System.currentTimeMillis());
+                if(!account.equals(permissionAccount(true)))throw new IllegalStateException("The node context changed. Review the burn again.");
+                BurnKoin.requireCurrent(snapshot,current,amount,approve,System.currentTimeMillis());
+            }),true,true)).show();
+    }
     private interface KeyTask { String run(String n) throws Exception; }
     private void keyTask(String title, KeyTask action) { keyTask(title,action,false); }
     private void keyTask(String title, KeyTask action, boolean sensitive) {
@@ -524,7 +600,7 @@ public final class MainActivity extends Activity {
                     if (latest.action != ProductionSetup.Action.REVIEW) { explainProduction(latest, now); return; }
                     new AlertDialog.Builder(this).setTitle("Start block production on " + networkLabel + "?")
                         .setMessage("Network: " + networkLabel + "\nProducer: " + account + "\nPublic signing key: " + LocalRpc.b64(publicKey)
-                            + "\n\nThis enables real block signing on the selected network. Keep the phone on power and stop any other node using this key. The app will recheck sync, VHP and registration, stop the observer cleanly, then start production. Use Stop node to stop production. Successful blocks consume VHP for KOIN rewards. This start action does not submit a separate token transaction.")
+                            + "\n\nAutomatic recovery will resume this same producer after temporary interruptions or reboot, following fresh observer, key and VHP checks. Stop node cancels automatic recovery.\n\nThis enables real block signing on the selected network. Keep the phone on power and stop any other node using this key. The app will recheck sync, VHP and registration, stop the observer cleanly, then start production. Use Stop node to stop production. Successful blocks consume VHP for KOIN rewards. This start action does not submit a separate token transaction.")
                         .setNegativeButton("Keep observer", null).setPositiveButton("Check and start production", (d, w) -> {
                             if (!chosen.equals(network) || !account.equals(getSharedPreferences("settings", MODE_PRIVATE).getString("producer-" + chosen, ""))) { message("Review again", "The network or producer account changed. Tap Review again to confirm the current account."); return; }
                             NodeService.ViewState node = NodeService.snapshot();
@@ -542,7 +618,7 @@ public final class MainActivity extends Activity {
         s.engine = engineAvailable; s.productionBuild = ProductionReview.buildAllowsProduction(engineAvailable, productionQualified, experimentalProduction);
         s.active = v.active;
         boolean pendingPermission=walletClient!=null&&walletClient.view().pending&&VaultClient.ALLOWANCE.equals(walletClient.view().kind);
-        s.busy = v.busy || snapshotBusy || permissionBusy || pendingPermission;
+        s.busy = v.busy || snapshotBusy || permissionBusy || burnBusy || pendingPermission || (walletClient!=null&&walletClient.view().pending&&VaultClient.BURN.equals(walletClient.view().kind));
         s.phase = pendingPermission ? "Check VHP permission in step 5 to resolve the saved allowance request" : permissionBusy ? "Checking VHP permission" : snapshotBusy ? "Checking chain snapshot" : v.phase;
         s.observer = NodeService.OBSERVER.equals(v.mode); s.producer = NodeService.PRODUCER.equals(v.mode); s.sameNetwork = network.equals(v.network);
         s.ready = v.ready; s.readiness = v.readiness; s.networkLabel = label(); s.keyBusy = keyBusy; s.reviewLoading = productionReviewLoading;

@@ -6,15 +6,15 @@ chain snapshot downloads and reward history. Docker, WSL and root are not requir
 
 ## Download
 
-**Latest version: 0.3.8 (build 16), including Silent Mode.**
+**Latest version: 0.3.9 (build 17), with automatic mining recovery and KOIN-to-VHP burns.**
 
-- [Download Teleno Node 0.3.8 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8.apk)
-- [Download the matching 0.3.8 source archive](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8-source.zip)
-- [SHA-256 checksums](releases/0.3.8/SHA256SUMS.txt)
-- [0.3.8 release notes and Silent Mode instructions](releases/0.3.8/RELEASE_NOTES.md)
+- [Download Teleno Node 0.3.9 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.9/Teleno-Node-0.3.9.apk)
+- [Download the matching 0.3.9 source archive](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.9/Teleno-Node-0.3.9-source.zip)
+- [SHA-256 checksums](releases/0.3.9/SHA256SUMS.txt)
+- [0.3.9 release notes and setup instructions](releases/0.3.9/RELEASE_NOTES.md)
 
 The APK and matching source are committed in this repository under
-[`releases/0.3.8`](releases/0.3.8). The links above download version 0.3.8 directly.
+[`releases/0.3.9`](releases/0.3.9). The links above download version 0.3.9 directly.
 The unchanged native engine can be rebuilt using the
 [0.3.7 native materials](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7-native-materials.zip).
 
@@ -22,20 +22,25 @@ Requires **Android 9 or newer and an ARM64 device**. Chain data requires substan
 free storage; Setup shows the space required for the selected snapshot. Removable
 storage is offered when Android exposes a suitable app-specific SD-card location.
 
-To update, stop the node and install the APK over the existing app. Version 0.3.8
-uses package `com.koinos.teleno`, version code **16** and the same signing
+To update, stop the node and install the APK over the existing app. Version 0.3.9
+uses package `com.koinos.teleno`, version code **17** and the same signing
 certificate as the earlier installers. Keep the existing app and its data.
 
-## What changed in 0.3.8
+## What changed in 0.3.9
 
-- Added **Silent Mode** beside Start/Stop on Home.
-- A pure-black fullscreen screensaver shows a dim, slowly moving box whose color
-  changes gradually. It displays the clock, latest finalized reward and date/time,
-  confirmed KOIN rewards this production run, reward count and a short node status.
-- Silent Mode keeps the display awake and caps this window's brightness at 5%.
-  Tap anywhere to return to Home; normal brightness and system bars return.
-- Rotation preserves Silent Mode. Backgrounding pauses the screensaver and releases
-  its screen policy; returning resumes it. Entering/exiting never restarts the node.
+- Recover a saved user-started run after temporary interruptions, native process
+  exits, Android service recreation and device reboot. Stop node cancels recovery.
+- Keep the process open during Wi-Fi loss; recover sustained RPC, chain and native
+  eligibility-counter stalls through an observer with fresh production checks.
+- Show the last interruption reason and Android background-running settings.
+- Burn an exact KOIN amount to VHP in the selected KOIN Vault wallet and optionally
+  approve its resulting VHP production balance in one explicitly reviewed transaction.
+- Preserve pending burn requests without automatic resubmission; confirm the exact
+  burn against irreversible history.
+- Retain Silent Mode's moving, dim black-screen display from 0.3.8.
+
+See the [release notes](releases/0.3.9/RELEASE_NOTES.md) for setup, recovery behavior
+and the physical-device validation still needed.
 
 ## Use the app
 
@@ -50,7 +55,7 @@ certificate as the earlier installers. Keep the existing app and its data.
 An observer does not need a wallet. Mainnet wallet approvals remain in KOIN Vault.
 The app checks chain readiness, account selection, key registration and production
 permissions before starting. VHP allowances are explicit wallet-approved actions;
-the app does not automatically burn KOIN or transfer funds.
+burns always require an explicit review and separate wallet approval.
 
 **Home** shows time/date, KOIN, VHP, mana, block height, peers, local blocks this run,
 device readings and recent finalized rewards. Its actions are Start/Stop and Silent Mode.
@@ -71,10 +76,10 @@ includes pinned source archives, all 171 link inputs, licenses and instructions
 for relinking with replacement libraries. APK-signing keys and wallet data are
 not distributed.
 
-Release validation covers 20 Robolectric tests, package/version checks, APK
+Release validation covers 26 Robolectric tests, package/version checks, APK
 signature verification, 16 KiB alignment and unchanged native engine hashes.
-No physical Android device or overnight connection test was available.
-See [validation details](releases/0.3.8/validation.json).
+No physical Android device, overnight connection test or live burn transaction was available.
+See [validation details](releases/0.3.9/validation.json).
 
 Publisher certificate SHA-256:
 

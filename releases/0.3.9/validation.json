@@ -1,0 +1,43 @@
+{
+  "version": "0.3.9",
+  "version_code": 17,
+  "package_id": "com.koinos.teleno",
+  "application_label": "Teleno Node",
+  "verified_at": "2026-11-20T01:36:29.694898+00:00",
+  "apk_bytes": 16724441,
+  "apk_sha256": "0cc07167f9887c4e6b9c6519585e59d073da163375b1a4a375c6cf0509ae925b",
+  "signing_certificate_sha256": "05db99a3f860721985cf7999e3503c6f652b3104a4e86750bcdb0553a00e71e1",
+  "same_signing_certificate_as_0_3_8": true,
+  "signature_scheme": "v3",
+  "zip_alignment_16k": true,
+  "native_and_assets_unchanged_from_0_3_8": true,
+  "native_sha256": {
+    "lib/arm64-v8a/libteleno_keys.so": "6830127dd2652b848d002a388a63f2fd817578ae97c34a6ac236310bf7bbee62",
+    "lib/arm64-v8a/libteleno_runner.so": "937e943f1c6ac17192ed483ad64f4fff5ea7bb134c179b9d172ee03b38785327",
+    "lib/arm64-v8a/libteleno_node.so": "c674f2cc04327009dfeefa1a178d178760c698322a55e58ac119606551fed927"
+  },
+  "ui_tests_passed": 26,
+  "ui_tests_failed": 0,
+  "ui_test_engine": "Robolectric 4.16 / API 33 native graphics, API 36 host shadow signatures",
+  "host_assertions": 601,
+  "new_burn_and_recovery_assertions": 124,
+  "burn_encoding_compared_with_desktop_koilib_pob_abi": true,
+  "physical_device_tested": false,
+  "overnight_device_tested": false,
+  "transactions_submitted": false,
+  "new_permissions": [
+    "ACCESS_WIFI_STATE",
+    "CHANGE_WIFI_STATE",
+    "RECEIVE_BOOT_COMPLETED",
+    "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+  ],
+  "production_qualification_unchanged": true,
+  "source_matches_apk_build": true,
+  "app_source_sha256": "eddb99726d5729fd9e08f36c0f93660c4df3f52356758661de8db75bf01fd833",
+  "remaining_validation": [
+    "Retroid overnight run",
+    "Physical reboot/process-kill behavior",
+    "Real KOIN Vault approval and burn after user review"
+  ],
+  "source_archive_sha256": "f247771eb936d57bfb7cbda9720119f73c296a2b148ce5e253df17787eabf9aa"
+}

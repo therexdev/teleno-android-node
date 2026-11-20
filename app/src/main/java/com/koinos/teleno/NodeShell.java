@@ -92,6 +92,9 @@ final class NodeShell {
             +"\nLocal block: "+node.height+"\nIrreversible: "+node.lib+"\nLocal block age: "+age
             +"\nPeers: "+(node.peers<0?"not reported":node.peers)+"\nLocal blocks this run: "+node.localBlocks
             +"\nChain readiness: "+node.readiness
+            +"\nAutomatic recovery requested: "+NodeService.resumeRequested(activity)
+            +"\nBattery optimization exempt: "+activity.getSystemService(android.os.PowerManager.class).isIgnoringBatteryOptimizations(activity.getPackageName())
+            +"\nLast interruption / stop: "+activity.getSharedPreferences("settings",0).getString("last-run-reason","not recorded")
             +(node.hasSample?"\nChain sample age: "+((now-node.sampleAt)/1000)+"s":"\nNo chain sample yet")
             +"\n\n"+(node.active&&NodeService.PRODUCER.equals(node.mode)?"Current production telemetry":"Retained telemetry / production is not active")
             +"\n"+node.production.report(SystemClock.elapsedRealtime())
