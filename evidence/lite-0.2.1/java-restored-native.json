@@ -1,0 +1,22 @@
+{
+  "java_apk_restore_native_startup_passed": true,
+  "preflight_passed": true,
+  "observer_recovery_hold_active": true,
+  "chain_id": {
+    "chain_id": "EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA=="
+  },
+  "head": {
+    "head_block_time": "0",
+    "head_state_merkle_root": "EiCEVEtENu_KAAJRaNac9msx6e-bm9H8AvFxmmVW0jCdmA==",
+    "head_topology": {
+      "height": "41258090",
+      "id": "0x1220d9ac9f820b0d0bdb5a8091fd0c8cf937f9e513067d4e0c5e83a91355d4cdae8d",
+      "previous": "0x0000"
+    },
+    "last_irreversible_block": "41258030"
+  },
+  "koin_decimals": {
+    "result": "CAg="
+  },
+  "physical_android_tested": false
+}

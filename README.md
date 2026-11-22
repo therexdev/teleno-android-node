@@ -1,9 +1,14 @@
-# Teleno Node Lite 0.2.0 — experimental compact miner
+# Teleno Node Lite 0.2.1 — experimental compact miner
 
 An independent Android application (`com.koinos.teleno.lite`) for local Koinos
 validation and mining. It can be installed alongside standard Teleno Node. It
 uses separate app storage, encrypted wallet/key aliases, notifications and ports
 (RPC 28085, P2P 28888). The standard app and its branch are unchanged.
+
+Version 0.2.1 fixes the fresh-install compact restore: it creates the database
+directory before copying files and replaces the incorrect download/resume error
+text. Install over Lite 0.2.0 and tap Restore compact checkpoint again; keep app
+data, wallet state and signing keys. The checkpoint and native engine are unchanged.
 
 ## Setup
 
@@ -62,6 +67,6 @@ block production remain untested**. `productionQualified` remains false. This
 APK explicitly enables experimental production for phone testing. No live wallet
 transaction was sent as part of these tests.
 
-See [the validation record](evidence/lite-0.2.0/VALIDATION.md) and
+See [the restore-fix validation record](evidence/lite-0.2.1/VALIDATION.md) and
 [build instructions](docs/BUILDING_LITE.md). The 0.1.0 foundation preview can still
 be built by omitting engine/snapshot inputs; it remains unable to start a node.

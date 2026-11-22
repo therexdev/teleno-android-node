@@ -52,14 +52,17 @@ final class LiteBundledSnapshot {
         try {
             if(NodeStorage.retained(c,n))throw new IOException("Validate and remove the previous retained backup before replacing this chain.");
             if(NodeStorage.free(c,n)<plan.bytes+NodeStorage.RESERVE)throw new IOException("Free "+DataUse.size(plan.bytes+NodeStorage.RESERVE)+" before restoring, including the reserve.");
-            fresh=NodeStorage.prepareSnapshot(c,n,selected,gen);long done=0;int count=0;
+            fresh=NodeStorage.prepareSnapshot(c,n,selected,gen);
+            File database=new File(fresh,"db");SnapshotDownload.plain(database,true);
+            if(!database.mkdir()&&!database.isDirectory())throw new IOException("Could not create the compact checkpoint database directory.");
+            long done=0;int count=0;
             for(SnapshotPlan.Entry entry:plan.files){
                 progress.update("Restoring compact checkpoint",done,plan.bytes,count,plan.files.size());
                 if(entry.path.equals("genesis_data.json")){
                     byte[] genesis=NodeConfig.asset(c,"compact/"+entry.path);
                     if(genesis.length!=entry.size||!SnapshotPlan.hash(genesis).equals(entry.hash)||!Arrays.equals(genesis,NodeConfig.asset(c,n+"-genesis.json")))throw new IOException("Compact genesis verification failed.");
                 }else {
-                    File output=new File(fresh,entry.path);SnapshotDownload.plain(output.getParentFile(),true);MessageDigest hash=MessageDigest.getInstance("SHA-256");long copied=0;
+                    File output=new File(fresh,entry.path);SnapshotDownload.plain(output.getParentFile(),true);SnapshotDownload.plain(output,false);MessageDigest hash=MessageDigest.getInstance("SHA-256");long copied=0;
                     try(InputStream in=c.getAssets().open("compact/"+entry.path);FileOutputStream out=new FileOutputStream(output)){
                         byte[] buffer=new byte[65536];int length;
                         while((length=in.read(buffer))!=-1){copied+=length;if(copied>entry.size)throw new IOException("Compact file exceeds its declared size.");out.write(buffer,0,length);hash.update(buffer,0,length);progress.update("Restoring compact checkpoint",done+copied,plan.bytes,count,plan.files.size());}

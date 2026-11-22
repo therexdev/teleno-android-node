@@ -1,0 +1,93 @@
+{
+  "checks": [
+    {
+      "action": "",
+      "id": "config",
+      "observed": "Configuration loaded with strict scalar and feature checks; CLI overrides applied.",
+      "status": "pass"
+    },
+    {
+      "action": "Compare configuration with the documented schema.",
+      "id": "config.schema",
+      "observed": "Unknown YAML keys and complete semantic validation are not covered.",
+      "status": "not_checked"
+    },
+    {
+      "action": "",
+      "id": "role",
+      "observed": "Observer configuration.",
+      "status": "pass"
+    },
+    {
+      "action": "Verify saved runtime options and budget WAL retention, flushing, compaction and recovery headroom.",
+      "id": "storage.wal",
+      "observed": "Automatic RocksDB WAL flush trigger configured; retained WAL usage is not measured.",
+      "status": "not_checked"
+    },
+    {
+      "action": "",
+      "id": "storage.permissions",
+      "observed": "OS permission check allows directory access; no write attempted.",
+      "status": "pass"
+    },
+    {
+      "action": "Budget chain growth, compaction, backups and restore separately; no universal capacity minimum is asserted.",
+      "id": "storage.available",
+      "observed": "23737569280 bytes available on the data directory volume.",
+      "status": "warning"
+    },
+    {
+      "action": "",
+      "id": "resources.cpu",
+      "observed": "1 logical CPUs reported; throughput is not measured.",
+      "status": "pass"
+    },
+    {
+      "action": "",
+      "id": "resources.memory",
+      "observed": "10451427328 host physical bytes; configured RocksDB block cache: 256 MiB. Total runtime memory is not estimated.",
+      "status": "pass"
+    },
+    {
+      "action": "Check effective service/container limits before deployment.",
+      "id": "resources.effective_limits",
+      "observed": "Available RAM, container/cgroup limits and CPU quotas are not measured.",
+      "status": "not_checked"
+    },
+    {
+      "action": "",
+      "id": "resources.files",
+      "observed": "Open-file soft limit: 16384; workload sufficiency is not verified.",
+      "status": "pass"
+    },
+    {
+      "action": "",
+      "id": "ports.jsonrpc",
+      "observed": "Local TCP bind succeeded; socket never listens and is released before exit.",
+      "status": "pass"
+    },
+    {
+      "action": "Ensure no other process owns this basedir before startup.",
+      "id": "storage.instance",
+      "observed": "Database locks and ownership are not tested; LOCK file existence is not proof of a running instance.",
+      "status": "not_checked"
+    },
+    {
+      "action": "Validate the selected network and observer head progress.",
+      "id": "network.identity",
+      "observed": "Genesis, database network identity, peers and connectivity are unverified.",
+      "status": "not_checked"
+    },
+    {
+      "action": "Use the dedicated restore preflight for restore sizing; validate recovery as an observer.",
+      "id": "storage.integrity",
+      "observed": "RocksDB was not opened; database health, recovery markers and restore capacity are unverified.",
+      "status": "not_checked"
+    }
+  ],
+  "exit_code": 0,
+  "no_known_blockers": true,
+  "runtime_readiness_verified": false,
+  "schema_version": 1,
+  "scope": "local-startup-prerequisites"
+}

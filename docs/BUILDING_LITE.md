@@ -117,7 +117,7 @@ python3 tools/build-apk.py --sdk /android-sdk --ecj /ecj.jar --bridge /native-bi
 python3 tools/test-ui.py --deps /robolectric-jars --ecj /ecj.jar \
   --test-class LiteRuntimeUiTest --output /test-output
 python3 tools/verify-lite-isolation.py --standard-root /standard-app \
-  --sdk /android-sdk --apk build/Teleno-Node-Lite-0.2.0.apk
+  --sdk /android-sdk --apk build/Teleno-Node-Lite-0.2.1.apk
 ```
 
 The snapshot's exact files and genesis are verified again before bundling. The
@@ -132,7 +132,7 @@ checkpoint. To recover them for a source rebuild, first verify the APK's supplie
 checksum/signature, then run:
 
 ```bash
-python3 tools/extract-lite-runtime.py --apk /Teleno-Node-Lite-0.2.0.apk \
+python3 tools/extract-lite-runtime.py --apk /Teleno-Node-Lite-0.2.1.apk \
   --output /new/extracted-runtime
 ```
 
@@ -140,3 +140,16 @@ Use `extracted-runtime/teleno_node`, `extracted-runtime/bridge` and
 `extracted-runtime/snapshot` with the APK build command above, and the matching
 `evidence/lite-0.2.0/native-production.json`. The extractor checks contained file
 sizes/hashes; it does not independently establish the publisher's identity.
+
+## Restore regression tests added in 0.2.1
+
+`LiteRestoreTest` executes the real restore using assets loaded from the built
+APK, with real host files and ownership locks. Only Android directory-fsync/lock
+entry points are shadowed. Run it with `--test-class LiteRestoreTest` and a fresh
+`--output` directory. It verifies every copied file and activation, then covers
+cancellation, preserved previous data/wallet sentinels, cleanup and a successful
+retry. The test also exports its actual restored database and observer-first
+markers for `tests/native/check_java_restore.py`. That helper starts an isolated
+ARM64 observer from a copy, checks native preflight, Mainnet state identity, the
+observer recovery hold and a local KOIN contract read. Physical-device operation
+remains separate. See `evidence/lite-0.2.1/VALIDATION.md`.

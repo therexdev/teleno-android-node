@@ -223,7 +223,7 @@ public final class NodeService extends Service {
                     synchronized(LOCK){VIEW.downloading=true;VIEW.downloadPercent=-1;}
                     final long[] clock={0,0,System.currentTimeMillis(),0,0};final String[] previous={""};final double[] speed={0};
                     SnapshotDownload.Progress compactProgress=(phase,done,total,files,count)->{
-                        if(epoch.get()!=request||stopRequested)throw new IOException("Download paused by you.");
+                        if(epoch.get()!=request||stopRequested)throw new IOException("Compact restore cancelled by you.");
                         long now=System.currentTimeMillis();
                         if(now-clock[1]>5000){requireEnvironment(false,mobile,true);clock[1]=now;}
                         if(now-wakeAt>5*60*1000L){wake.acquire(10*60*1000L);wakeAt=now;}
@@ -235,7 +235,7 @@ public final class NodeService extends Service {
                             int percent=total==0?-1:(int)Math.min(100,done*100.0/total);
                             String detail=total==0?"Checking the exact snapshot and selected storage.":SnapshotDownload.gib(done)+" / "+SnapshotDownload.gib(total)+" GiB · "+percent+"%\n"+files+" / "+count+" files verified";
                             if(speed[0]>1024){long seconds=(long)((total-done)/speed[0]);detail+=String.format(Locale.ROOT,"\n%.1f MiB/s · about %d min remaining",speed[0]/1048576.0,Math.max(1,(seconds+59)/60));}
-                            detail+="\nStorage: "+NodeStorage.label(this,chosen)+". Keep your connection available and the selected storage inserted.";
+                            detail+="\nStorage: "+NodeStorage.label(this,chosen)+". Copying from the APK; no internet or Wi-Fi is needed. Keep the selected storage inserted.";
                             synchronized(LOCK){VIEW.downloadPercent=percent;}
                             status(phase,detail);
                             if(now-clock[4]>5000||percent==100){saveDownload(phase+"\n"+detail,percent);clock[4]=now;}
@@ -277,9 +277,9 @@ public final class NodeService extends Service {
             } catch (Exception | LinkageError e) {
                 if (PRODUCER.equals(action)) synchronized (LOCK) { VIEW.productionProblemNetwork = chosen; VIEW.productionProblem = e.getMessage() == null ? "Production did not start. Review the current node status and try again." : e.getMessage(); }
                 if(DOWNLOAD_CHAIN.equals(action)) {
-                    String reason=e.getMessage()==null?"Check your connection and selected storage.":e.getMessage();
-                    String detail=reason+"\nVerified download files are kept. Tap Resume chain download to continue. If the restore already completed, tap Start observer.";
-                    saveDownload(detail,snapshot().downloadPercent);status("Chain download needs attention",detail);
+                    String reason=e.getMessage()==null?"Check the selected storage and available space.":e.getMessage();
+                    String detail=reason+"\nYour existing chain, wallet connection and signing keys are preserved. Tap Restore compact checkpoint to retry the local copy from this APK; no network download is needed. If it already completed, use Start node.";
+                    saveDownload(detail,-1);status("Compact restore needs attention",detail);
                 }else {failure(e);if(wanted&&process==null&&!stopRequested)waitForRecovery(e.getMessage());}
             }
             finally { synchronized (LOCK) { VIEW.busy = recovering;VIEW.downloading=false; } if (process == null&&!wanted) endService(); }

@@ -32,3 +32,8 @@ After building the experimental APK classes, use `--test-class LiteRuntimeUiTest
 This exercises the enabled four-step UI, bundled manifest pin, path/network/window
 rejection, required compact restore and burn review without stopping a miner.
 The original suite is still used for builds that omit the runtime inputs.
+
+`--test-class LiteRestoreTest` (0.2.1) runs a complete restore from the actual
+APK assets, including fresh directories, all file checksums, publication,
+cancellation, preserved old data and a retry. Use a fresh output directory;
+`restored-checkpoint` can then be tested with the native handoff helper.

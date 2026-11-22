@@ -1,0 +1,23 @@
+{
+  "applicationId": "com.koinos.teleno.lite",
+  "versionName": "0.2.1",
+  "versionCode": 3,
+  "apkBytes": 71306552,
+  "apkSha256": "5b9801e221b21039311debe6d579fc9f56eaccd337fb34f1f7140e81cbd0a2ac",
+  "publisherCertificateSha256": "05db99a3f860721985cf7999e3503c6f652b3104a4e86750bcdb0553a00e71e1",
+  "engineSha256": "36dae70b7fa3bbba95140010341d0d92424666c0c0fad9d40746525a548bbbd6",
+  "snapshotBytes": 60592409,
+  "snapshotRevision": 41258090,
+  "snapshotManifestSha256": "0d85642265851c5236bee55c8bad2f4d27df32fbaab66b1ccf56e3fc428cc2ac",
+  "experimentalProductionEnabled": true,
+  "productionQualified": false,
+  "physicalDeviceTested": false,
+  "mainnetPobProductionTested": false,
+  "isolatedFederatedProductionPassed": true,
+  "nativeReferenceRootsMatchedThrough": 152,
+  "standardAppSourceUnchanged": true,
+  "standardAppSha256": "c66c2e49a2879167b75e058fa65603626ef0d0364dce70786ea730d34502f95e",
+  "completeAndroidRestoreTested": true,
+  "cancelPreservationAndRetryTested": true,
+  "javaRestoredNativeStartupPassed": true
+}

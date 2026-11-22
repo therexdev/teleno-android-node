@@ -1,0 +1,20 @@
+JUnit version 4.13.2
+.E.E
+Time: 3.293
+There were 2 failures:
+1) freshInstallRestoresEveryBundledDatabaseFileAndActivatesIt(com.koinos.teleno.LiteRestoreTest)
+java.io.FileNotFoundException: /tmp/lite-apk-restore-17132345833382716959/teleno-lite-chain/mainnet-eff82f685ccb42c592510f4b3412db4f/db/000009.sst (No such file or directory)
+	at java.base/java.io.FileOutputStream.open0(Native Method)
+	at java.base/java.io.FileOutputStream.open(FileOutputStream.java:289)
+	at java.base/java.io.FileOutputStream.<init>(FileOutputStream.java:230)
+	at java.base/java.io.FileOutputStream.<init>(FileOutputStream.java:179)
+	at com.koinos.teleno.LiteBundledSnapshot.restore(LiteBundledSnapshot.java:63)
+	at com.koinos.teleno.LiteRestoreTest.freshInstallRestoresEveryBundledDatabaseFileAndActivatesIt(LiteRestoreTest.java:62)
+2) cancellationLeavesExistingChainAndWalletFilesUnchangedAndRetrySucceeds(com.koinos.teleno.LiteRestoreTest)
+org.junit.ComparisonFailure: expected:<[test cancellation]> but was:<[/tmp/lite-apk-restore-16103080066048674880/teleno-lite-chain/mainnet-df7f5717e92d4dd295b8daa08c8efe8b/db/000009.sst (No such file or directory)]>
+	at org.junit.Assert.assertEquals(Assert.java:117)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at com.koinos.teleno.LiteRestoreTest.cancellationLeavesExistingChainAndWalletFilesUnchangedAndRetrySucceeds(LiteRestoreTest.java:81)
+
+FAILURES!!!
+Tests run: 2,  Failures: 2
