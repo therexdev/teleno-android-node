@@ -1,0 +1,23 @@
+{
+  "chain_id": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+      "chain_id": "EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA=="
+    }
+  },
+  "head": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+      "head_block_time": "0",
+      "head_state_merkle_root": "EiCEVEtENu_KAAJRaNac9msx6e-bm9H8AvFxmmVW0jCdmA==",
+      "head_topology": {
+        "height": "41258090",
+        "id": "0x1220d9ac9f820b0d0bdb5a8091fd0c8cf937f9e513067d4e0c5e83a91355d4cdae8d",
+        "previous": "0x0000"
+      },
+      "last_irreversible_block": "41258030"
+    }
+  }
+}

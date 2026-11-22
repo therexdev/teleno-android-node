@@ -32,6 +32,6 @@ features:
   jsonrpc: true
   grpc: false
   block_producer: false
-  contract_meta_store: true
-  transaction_store: true
-  account_history: true
+  contract_meta_store: false
+  transaction_store: false
+  account_history: false

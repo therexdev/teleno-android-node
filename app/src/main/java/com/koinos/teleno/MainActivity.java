@@ -105,8 +105,8 @@ public final class MainActivity extends Activity {
         scroll.addView(content);
         content.addView(text("TELENO LITE  /  GET STARTED", 12, GREEN, true));
         content.addView(text("Teleno Node Lite", 30, INK, true));
-        content.addView(text("App " + appVersion() + " · " + "Lite preview", 14, GREEN, true));
-        content.addView(text("Lite has its own wallet connection, keys and app data. Compact mining is not available in this preview.", 15, MUTED, false));
+        content.addView(text("App " + appVersion() + " · " + (LitePreview.ready()?"Experimental compact miner":"Lite preview"), 14, GREEN, true));
+        content.addView(text(LitePreview.ready()?"Lite has its own wallet connection, keys and app data. Restore the compact checkpoint, then start the local node.":"Lite has its own wallet connection, keys and app data. Compact mining is not available in this preview.", 15, MUTED, false));
         LinearLayout status = card(null);
         state = text("Stopped", 25, INK, true); status.addView(state);
         detail = text("", 15, MUTED, false); status.addView(detail);
@@ -131,7 +131,7 @@ public final class MainActivity extends Activity {
         walletOptions.addView(text("Vault connections last about 30 minutes. Reconnect only for a new wallet transaction after expiry or disconnection. Mining uses your saved account and signing key and does not need a live Vault connection.",14,MUTED,false));
         accountButton = button(walletOptions, "Use another wallet · enter address manually", this::setAccount);
         LinearLayout burn = card("2  ·  Burn KOIN to VHP");
-        burn.addView(text("Convert KOIN to VHP with Vault approval. Burning is irreversible and does not enable mining in this Lite preview.",14,MUTED,false));
+        burn.addView(text(LitePreview.ready()?"Convert KOIN to VHP and approve production through KOIN Vault. Burning is irreversible. Your node can keep running during wallet approval.":"Convert KOIN to VHP with Vault approval. Burning is irreversible and does not enable mining in this Lite preview.",14,MUTED,false));
         burnText=text("",14,INK,false);burn.addView(burnText);
         burnButton=button(burn,"Burn KOIN → VHP…",this::loadBurn);burnButton.setTag("burn-koin");
         checkBurn=button(burn,"Check saved KOIN burn",()->walletAction("KOIN burn status",this::checkBurnHistory,false,true));
@@ -148,7 +148,7 @@ public final class MainActivity extends Activity {
             .setMessage("Check KOIN Vault's transaction history and pending approvals first. Closing this saved record does not cancel a submitted transaction or revoke an allowance. The transaction might still complete. Nothing will be resent. Check the local allowance before making a new request.")
             .setNegativeButton("Keep request",null).setPositiveButton("I checked the wallet",(d,w)->walletAction("Permission record updated",VaultClient::dismissExpiredAllowance,false,true)).show());
         LinearLayout sync = card("3  ·  Compact chain");
-        sync.addView(text("The compact snapshot is still being developed. This preview cannot download the standard node database or access the standard app’s chain data.", 14, MUTED, false));
+        sync.addView(text(LitePreview.ready()?"Restore the compact Mainnet checkpoint included in this APK. This step uses no additional network data. The node downloads newer blocks after startup.":"The compact snapshot is still being developed. This preview cannot download the standard node database or access the standard app’s chain data.", 14, MUTED, false));
         snapshotSetupText=text("",14,INK,true);sync.addView(snapshotSetupText);
         snapshotText=text("",14,INK,false);snapshotText.setTextIsSelectable(true);sync.addView(snapshotText);
         snapshotProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);snapshotProgress.setMax(100);sync.addView(snapshotProgress,new LinearLayout.LayoutParams(-1,dp(10)));
@@ -158,9 +158,9 @@ public final class MainActivity extends Activity {
         discardDownload=button(sync,"Discard unfinished download…",()->new AlertDialog.Builder(this).setTitle("Discard the unfinished download?")
             .setMessage("Only the inactive snapshot download will be deleted. The current chain database, wallet connection and signing keys are kept. You can then check for a newer snapshot or start the observer normally.")
             .setNegativeButton("Keep download",null).setPositiveButton("Discard download",(d,w)->{if(!NodeService.isActive())send(NodeService.DISCARD_DOWNLOAD);}).show());
-        sync.addView(text("The Lite compact snapshot and storage requirement will be shown here once validated. The standard app’s chain is kept separate.", 14, MUTED, false));
+        sync.addView(text(LitePreview.ready()?"The checkpoint is about 61 MB, plus a 2 GiB free-space reserve. Current chain state grows over time; finalized old block history is pruned.":"The Lite compact snapshot and storage requirement will be shown here once validated. The standard app’s chain is kept separate.", 14, MUTED, false));
         LinearLayout produce = card("4  ·  Start node");
-        produce.addView(text("Compact mining is not available yet. Start node shows preview status; it will not start the standard full-storage engine.", 14, MUTED, false));
+        produce.addView(text(LitePreview.ready()?"Start node runs the observer, checks local readiness, then starts mining with the reviewed account and registered device key.":"Compact mining is not available yet. Start node shows preview status; it will not start the standard full-storage engine.", 14, MUTED, false));
         productionText = text("", 14, INK, true); produce.addView(productionText);
         production = button(produce, "Start node", this::startNode);
         button(produce,"Production health / copy report",()->{if(shell!=null)shell.showProductionHealth();}).setTag("production-health");
@@ -233,7 +233,7 @@ public final class MainActivity extends Activity {
         boolean existingChain=NodeStorage.hasChain(this,network),recoverableChain=NodeStorage.hasRecoverableChain(this,network);
         next.setText(v.active?v.readiness:existingChain?"Next: Start node in step 4. Your existing chain and signing key are reused; no new snapshot is required."
             :recoverableChain?"Next: Find existing chain data in step 3. Your files may still be here; do not delete them or download again yet."
-            :"Next: "+(engineAvailable?"choose chain storage, then review a snapshot in step 3, or Start observer to sync normally on "+label()+".":"Install a complete node engine."));
+            :"Next: "+(engineAvailable?"restore the bundled compact checkpoint in step 3, then Start node.":"Install a complete node engine."));
         engineText.setText(Build.MANUFACTURER + " " + Build.MODEL + " · Android " + Build.VERSION.RELEASE + "\n"
             + String.format(java.util.Locale.ROOT, "%.1f GiB RAM · ", memory.totalMem / 1073741824.0) + freeLabel
             + "\n" + (arm ? "ARM64 is supported by this app." : "This app requires a 64-bit ARM Android installation.")
@@ -249,8 +249,9 @@ public final class MainActivity extends Activity {
         downloadChain.setText(setup.label);downloadChain.setEnabled(setup.enabled());
         findChain.setEnabled(!v.active&&!v.busy&&!snapshotBusy&&!findingChain);findChain.setText(findingChain?"Looking for existing chain data…":"Find existing chain data…");
         replaceChain.setVisibility(existingChain?View.VISIBLE:View.GONE);replaceChain.setEnabled(!v.busy&&!snapshotBusy&&!findingChain);
-        snapshotSetupText.setText("Network: "+label()+"\nCompact snapshot not available in this preview.");
-        downloadChain.setText("Compact snapshot not available yet");
+        snapshotSetupText.setText("Network: "+label()+(LitePreview.ready()?"\nBundled compact checkpoint · no full-chain download.":"\nCompact snapshot not available in this preview."));
+        downloadChain.setText(LitePreview.ready()?(existingChain?"Compact chain already restored":"Restore compact checkpoint…"):"Compact snapshot not available yet");
+        downloadChain.setEnabled(!v.active&&!v.busy&&!snapshotBusy&&!existingChain);
         findChain.setVisibility(View.GONE);replaceChain.setVisibility(View.GONE);
         discardDownload.setVisibility(LitePreview.ready()&&savedDownload?View.VISIBLE:View.GONE);discardDownload.setEnabled(!v.active&&!v.busy&&!snapshotBusy);
         boolean liveDownload=v.downloading&&network.equals(v.network);
@@ -290,10 +291,10 @@ public final class MainActivity extends Activity {
             ?permissionSnapshot.status():"No chain download is needed to burn or check VHP permission.";
         if(pendingPermission)permissionNote+="\n\nSaved permission request: "+WalletReader.amount(wallet.amount)+" VHP. "+wallet.note+(wallet.txid.isEmpty()?"":"\nTransaction: "+wallet.txid);
         permissionText.setText(permissionBusy?"Checking the VHP balance and PoB allowance…":permissionNote);
-        productionText.setText(LitePreview.STATUS);
+        productionText.setText(LitePreview.ready()?productionSetup(v).note + productionProblem(v):LitePreview.STATUS);
         recent.setText(v.events.isEmpty() ? "No node events yet. Progress and next steps appear above." : android.text.TextUtils.join("\n\n", v.events));
         dashboard.select(network,account);dashboard.run(v);if(resumed)dashboard.tick();
-        state.setText("Lite preview");detail.setText(LitePreview.EXPLANATION);next.setText(LitePreview.STATUS);
+        if(!LitePreview.ready()){state.setText("Lite preview");detail.setText(LitePreview.EXPLANATION);next.setText(LitePreview.STATUS);}
         shell.bind(v,dashboard,!v.busy&&!keyBusy&&!snapshotBusy,stop.isEnabled(),network,account,exists,free,appVersion());
         silent.view.bind(v,dashboard);
         if(wallet!=null&&(wallet.pairing||wallet.connected)&&System.currentTimeMillis()-lastWalletPoll>6000&&!walletBusy.get()) {
@@ -322,52 +323,18 @@ public final class MainActivity extends Activity {
     private void reviewSnapshot(){reviewSnapshot(false);}
     private void reviewSnapshot(boolean replace) {
         if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
-        long availableBytes=-1;String storageProblem="";
-        try{availableBytes=NodeStorage.free(this,network);}catch(Exception e){storageProblem=e.getMessage();}
-        SnapshotSetup setup=snapshotSetup(NodeService.snapshot(),availableBytes,storageProblem);
-        if(replace){
-            SnapshotSetup.State override=new SnapshotSetup.State();NodeService.ViewState v=NodeService.snapshot();
-            override.engine=engineAvailable;override.arm64=Arrays.asList(Build.SUPPORTED_64_BIT_ABIS).contains("arm64-v8a");override.free=availableBytes;override.storageProblem=storageProblem;
-            override.active=v.active;override.busy=v.busy;override.checking=snapshotBusy;override.keyBusy=keyBusy;override.saved=SnapshotBootstrap.pending(this,network);
-            override.retained=NodeStorage.retained(this,network);override.validated=NodeStorage.canClean(this,network);override.replace=true;setup=SnapshotSetup.from(override);
-        }
-        if(setup.action==SnapshotSetup.Action.USE_EXISTING){if(NodeService.isActive())message("Existing chain is in use",setup.note);else shell.setup(4);return;}
-        if(setup.action==SnapshotSetup.Action.FIND_EXISTING){findExistingChain();return;}
-        final String setupNote=setup.note;
-        if(setup.action==SnapshotSetup.Action.STOP_NODE) {
-            new AlertDialog.Builder(this).setTitle("Stop the node for snapshot setup?").setMessage(setupNote+"\n\nStopping preserves the current database. You will review the snapshot and its size before any download starts.")
-                .setNegativeButton("Keep running",null).setPositiveButton("Stop node",(d,w)->send(NodeService.STOP)).show();return;
-        }
-        if(setup.action==SnapshotSetup.Action.CLEAN_PREVIOUS){cleanStorage();return;}
-        if(setup.action==SnapshotSetup.Action.START_OBSERVER) {
-            new AlertDialog.Builder(this).setTitle("Validate chain storage first").setMessage(setup.note)
-                .setNegativeButton("Not now",null).setPositiveButton("Start observer",(d,w)->runNode(NodeService.OBSERVER)).show();return;
-        }
-        if(setup.action!=SnapshotSetup.Action.REVIEW){message("Snapshot setup",setup.note);return;}
+        if(NodeService.isActive()){message("Stop node first","Stop the node before restoring a compact checkpoint. Your current data is kept.");return;}
+        if(NodeStorage.hasChain(this,network)&&!replace){message("Compact chain is ready","Use Start node. No new snapshot is required.");return;}
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){notificationSnapshotReplace=replace;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},11);return;}
-        final String chosen=network;final String selected=NodeStorage.volume(this,chosen);snapshotBusy=true;refresh();
-        work.execute(()->{
-            try {
-                SnapshotPlan plan=SnapshotBootstrap.review(this,chosen);long free=NodeStorage.free(this,chosen);boolean resume=SnapshotBootstrap.pending(this,chosen);long remaining=SnapshotBootstrap.estimatedRemaining(this,chosen,plan);
-                handler.post(()->{
-                    snapshotBusy=false;if(isFinishing()||isDestroyed())return;refresh();
-                    if(NodeService.isActive()||!chosen.equals(network)||!selected.equals(NodeStorage.volume(this,chosen)))return;
-                    String info="Network: "+label()+"\nStorage: "+NodeStorage.label(this,chosen)+"\nSnapshot: "+plan.created
-                        +(plan.head>0?"\nStarting block: "+String.format(java.util.Locale.ROOT,"%,d",plan.head):"")
-                        +"\nFull snapshot download: "+DataUse.size(plan.bytes)+(resume?"\nEstimated remaining download: "+DataUse.size(remaining):"")+"\nFree space: "+SnapshotDownload.gib(free)+" GiB\n"
-                        +(resume?"Verified files are reused. Remaining space is checked before downloading more.":"Requires "+SnapshotDownload.gib(plan.bytes+SnapshotPlan.RESERVE)+" GiB free, including a 2 GiB reserve. Existing chain data stays in place.")
-                        +"\n\nThis uses the Foundation's published chain state, then validates new blocks locally. Every downloaded file is checked against its published SHA-256 checksum. Your existing chain is kept until the restored observer advances. Wallet keys and configuration are preserved. Production stays off.";
-                    AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle(resume?"Resume this chain download?":"Download and sync the chain?").setMessage(info).setNegativeButton("Not now",null);
-                    if(resume||free>=plan.bytes+SnapshotPlan.RESERVE)dialog.setPositiveButton(resume?"Resume":"Download and sync",(d,w)->{
-                        if(NodeService.isActive()||!chosen.equals(network)||!selected.equals(NodeStorage.volume(this,chosen)))return;
-                        if(NetworkPolicy.needsConsent(this))showMobileDownloadReview(plan,remaining,()->startSnapshotDownload(chosen,selected,plan,true));
-                        else startSnapshotDownload(chosen,selected,plan,false);
-                    });
-                    else dialog.setNeutralButton("Free up storage first",(d,w)->{});
-                    dialog.show();
-                });
-            }catch(Exception e){handler.post(()->{snapshotBusy=false;if(!isFinishing()&&!isDestroyed()){getSharedPreferences("settings",MODE_PRIVATE).edit().putString("snapshot-status-"+chosen,"Snapshot check failed: "+e.getMessage()+"\nExisting chain data was preserved. Follow the message above before retrying.").apply();refresh();}});}
-        });
+        final String chosen=network;try {
+            LiteBundledSnapshot plan=LiteBundledSnapshot.read(this,chosen);long free=NodeStorage.free(this,chosen);
+            String note="Mainnet checkpoint at block "+plan.height+"\nRestore size: "+DataUse.size(plan.bytes)+"\nFree space: "+DataUse.size(free)
+                +"\nRequired: "+DataUse.size(plan.bytes+NodeStorage.RESERVE)+" including reserve."
+                +"\n\nThis checkpoint is included in the APK. No extra download or Wi-Fi is needed to restore. It uses the Foundation's published state; newer blocks are validated locally after startup. Your existing chain is retained during replacement. Wallet keys stay private.";
+            AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle("Restore compact checkpoint?").setMessage(note).setNegativeButton("Cancel",null);
+            if(free>=plan.bytes+NodeStorage.RESERVE)dialog.setPositiveButton("Restore checkpoint",(d,w)->{if(!NodeService.isActive()&&chosen.equals(network))startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.DOWNLOAD_CHAIN).putExtra("network",chosen).putExtra("manifest_hash",plan.hash));});
+            dialog.show();
+        }catch(Exception e){message("Compact checkpoint unavailable",e.getMessage());}
     }
     private void startSnapshotDownload(String chosen,String selected,SnapshotPlan plan,boolean allowMobile) {
         if(NodeService.isActive()||!chosen.equals(network)||!selected.equals(NodeStorage.volume(this,chosen)))return;

@@ -1,0 +1,15 @@
+PASS: 39 core and host-JNI assertions. Android runtime testing is separate.
+PASS: 18 storage copy, recovery and native ownership checks (host Linux).
+PASS: 102 wallet protocol, wire-format and recovery assertions (fixture transport; no live signing).
+PASS: 48 bounded VHP permission, network, wire-format and review assertions (read-only fixture RPC).
+PASS: 34 snapshot metadata, checksum, resume, cancellation, capacity and path-safety assertions (fixture downloads).
+PASS: 23 TLS retry, partial resume, cancellation and integrity assertions.
+PASS: 16 snapshot setup action and maintenance-exclusion assertions.
+PASS: 85 production review and native-status assertions. Actual Android production is not tested here.
+PASS: 24 native log classification assertions.
+PASS: 45 dashboard balances, receipt validation and history pagination assertions.
+PASS: 27 production setup and actionable-readiness assertions. Android UI testing is separate.
+PASS: 130 burn and recovery assertions; no live wallet signing.
+PASS: 23 mobile-data consent, saved-chain flow, resume and active-data protection assertions (case-insensitive copy assertion corrected).
+PASS: 26 startup-port, cancellation and real TCP handoff assertions; observed handoff 62 seconds.
+PASS: supervisor exclusive ownership, graceful stop, transient key cleanup, parent-death shutdown and private stdin transport.

@@ -17,7 +17,7 @@ public final class DataStorageTests {
         rejects(()->DataUse.warning(total,total+1),"invalid remaining size blocked");rejects(()->DataUse.warning(-1,0),"negative total blocked");
         SnapshotSetup.State state=state();state.existing=true;state.retained=state.validated=true;
         check(SnapshotSetup.from(state).action==SnapshotSetup.Action.USE_EXISTING,"an updated app uses the saved chain instead of demanding cleanup or download");
-        check(SnapshotSetup.from(state).note.contains("no snapshot download or backup deletion"),"existing-chain next action explains no cleanup requirement");
+        check(SnapshotSetup.from(state).note.toLowerCase(java.util.Locale.ROOT).contains("no snapshot download or backup deletion"),"existing-chain next action explains no cleanup requirement");
         state.active=true;check(SnapshotSetup.from(state).action==SnapshotSetup.Action.USE_EXISTING,"running saved chain never redirects to snapshot setup");
         state=state();state.recoverable=true;check(SnapshotSetup.from(state).action==SnapshotSetup.Action.FIND_EXISTING,"lost selection offers read-only discovery before a new download");
         state.existing=true;state.saved=true;check(SnapshotSetup.from(state).label.contains("Resume"),"unfinished transfer remains resumable");

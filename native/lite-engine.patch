@@ -1,0 +1,378 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index daa275d..7431dc3 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -1321,3 +1321,9 @@ if(COMMAND koinos_install)
+ else()
+   install(TARGETS teleno_node RUNTIME DESTINATION bin)
+ endif()
++
++if(KOINOS_BUILD_TESTS)
++  add_executable(koinos_lite_retention_test ../tests/storage/lite_retention_test.cpp)
++  target_link_libraries(koinos_lite_retention_test PRIVATE koinos_block_store_lib koinos_storage_lib)
++  add_test(NAME koinos_lite_retention_test COMMAND koinos_lite_retention_test)
++endif()
+diff --git a/src/block_store/block_store.cpp b/src/block_store/block_store.cpp
+index 107ec02..60495fd 100644
+--- a/src/block_store/block_store.cpp
++++ b/src/block_store/block_store.cpp
+@@ -1,10 +1,13 @@
+ #include "block_store.hpp"
+ #include "skip_list.hpp"
++#include "storage/lite_state.hpp"
+ 
+ #include <koinos/exception.hpp>
+ #include <koinos/log.hpp>
+ 
+ #include <stdexcept>
++#include <charconv>
++#include <limits>
+ #include <rocksdb/write_batch.h>
+ 
+ namespace koinos::node::block_store {
+@@ -12,6 +15,9 @@ namespace koinos::node::block_store {
+ // Metadata key: single byte 0x01 (same as Go implementation)
+ const std::string BlockStore::META_KEY = std::string( 1, '\x01' );
+ 
++const std::string BlockStore::LITE_FLOOR_KEY = "lite.retained_from";
++const std::string BlockStore::LITE_HEIGHT_PREFIX = "lite.height/";
++
+ KOINOS_DECLARE_EXCEPTION( block_store_exception );
+ KOINOS_DECLARE_DERIVED_EXCEPTION( block_not_present, block_store_exception );
+ KOINOS_DECLARE_DERIVED_EXCEPTION( unexpected_height, block_store_exception );
+@@ -117,6 +123,9 @@ void BlockStore::update_highest_block( const koinos::block_topology& topo )
+ std::string BlockStore::get_ancestor_id_at_height( const std::string& block_id,
+                                                     uint64_t target_height ) const
+ {
++  const auto policy=read_lite_policy();
++  if( policy.floor && target_height < policy.floor )
++    KOINOS_THROW( block_not_present, "requested history is outside the Lite retention window" );
+   std::string current_id = block_id;
+   bool has_expected_height = false;
+   uint64_t expected_height = 0;
+@@ -230,6 +239,9 @@ void BlockStore::initialize()
+     update_highest_block( topo );
+     LOG( info ) << "[block_store] Initialized metadata with genesis";
+   }
++  const auto policy=read_lite_policy();
++  if(policy.floor && topo.height() && policy.floor>topo.height())
++    throw std::runtime_error("Lite retention floor exceeds stored head");
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -365,6 +377,9 @@ BlockStore::add_block( const rpc::block_store::add_block_request& req )
+   uint64_t height    = header.height();
+ 
+   // Check if already stored
++  const auto policy=read_lite_policy();
++  if( policy.window && height < policy.floor )
++    KOINOS_THROW( block_not_present, "cannot reinsert pruned historical blocks into a Lite node" );
+   auto existing = get_record_bytes( block.id() );
+   if( !existing.empty() )
+   {
+@@ -403,7 +418,13 @@ BlockStore::add_block( const rpc::block_store::add_block_request& req )
+     {
+       uint64_t h = prev_heights[ i ];
+ 
+-      if( h == height - 1 )
++      if( policy.window && h < policy.floor )
++      {
++        // Keep positional skip-list slots. Ancestor reads at/above the floor
++        // never select these pointers; historical payloads are unavailable.
++        record.add_previous_block_ids( "" );
++      }
++      else if( h == height - 1 )
+       {
+         // Direct parent: use header.previous
+         record.add_previous_block_ids( header.previous() );
+@@ -439,6 +460,11 @@ BlockStore::add_block( const rpc::block_store::add_block_request& req )
+   rocksdb::WriteBatch batch;
+   auto status=batch.Put(_cf_blocks,block.id(),record_bytes);
+   if(!status.ok()) KOINOS_THROW(db_error,"cannot stage block record");
++  if( policy.window )
++  {
++    status=batch.Put(_cf_meta,height_key(height,block.id()),block.id());
++    if(!status.ok()) KOINOS_THROW(db_error,"cannot stage Lite height index");
++  }
+ 
+   // Update highest block if this is the new tip
+   koinos::block_topology current_highest;
+@@ -466,6 +492,93 @@ BlockStore::add_block( const rpc::block_store::add_block_request& req )
+   return resp;
+ }
+ 
++
++std::string BlockStore::height_key( uint64_t height, const std::string& id )
++{
++  std::string key=LITE_HEIGHT_PREFIX;
++  for( int shift=56; shift>=0; shift-=8 ) key.push_back(static_cast<char>(height>>shift));
++  return key+id;
++}
++
++BlockStore::LitePolicy BlockStore::read_lite_policy() const
++{
++  std::string floor_text, window_text;
++  auto status=_db->Get({},_cf_meta,LITE_FLOOR_KEY,&floor_text);
++  auto window_status=_db->Get({},_cf_meta,"lite.retention_blocks",&window_text);
++  if(status.IsNotFound() && window_status.IsNotFound())return {};
++  if(!status.ok() || !window_status.ok())throw std::runtime_error("incomplete or unreadable Lite retention policy");
++  LitePolicy policy;
++  auto number=[](const std::string& text,uint64_t& value) {
++    const auto parsed=std::from_chars(text.data(),text.data()+text.size(),value);
++    return parsed.ec==std::errc{} && parsed.ptr==text.data()+text.size();
++  };
++  if(!number(floor_text,policy.floor) || !number(window_text,policy.window)
++     || !policy.floor || policy.window<64 || policy.window>1000000)
++    throw std::runtime_error("invalid persisted Lite retention policy");
++  return policy;
++}
++
++uint64_t BlockStore::retained_from() const
++{
++  std::shared_lock lock(_mutex);return read_lite_policy().floor;
++}
++
++void BlockStore::enable_lite( uint64_t retained_blocks )
++{
++  if(retained_blocks<64 || retained_blocks>1000000)throw std::invalid_argument("Lite retained blocks must be between 64 and 1000000");
++  std::unique_lock lock(_mutex);koinos::block_topology highest;
++  if(!get_highest_block_topology(highest))throw std::runtime_error("initialize block store before enabling Lite mode");
++  const auto policy=read_lite_policy();
++  if(policy.floor)
++  {
++    if(policy.window!=retained_blocks)throw std::runtime_error("Lite retention changes require a separate snapshot export");
++    return;
++  }
++  if(highest.height()!=0)throw std::runtime_error("existing archive requires a separate compact export; automatic destructive conversion is disabled");
++  rocksdb::WriteBatch batch;
++  auto status=batch.Put(_cf_meta,LITE_FLOOR_KEY,"1");if(!status.ok())throw std::runtime_error(status.ToString());
++  status=batch.Put(_cf_meta,"lite.retention_blocks",std::to_string(retained_blocks));if(!status.ok())throw std::runtime_error(status.ToString());
++  rocksdb::WriteOptions writes;writes.sync=true;
++  status=_db->Write(writes,&batch);if(!status.ok())throw std::runtime_error(status.ToString());
++}
++
++void BlockStore::advance_lite_finality( uint64_t durable_finalized_height )
++{
++  std::unique_lock lock(_mutex);
++  const auto policy=read_lite_policy();
++  if(!policy.window || durable_finalized_height<=policy.window)return;
++  koinos::block_topology highest;
++  if(!get_highest_block_topology(highest) || durable_finalized_height>highest.height())
++    throw std::runtime_error("Lite finality exceeds archived head");
++  const uint64_t target=durable_finalized_height-policy.window;
++  if(target<=policy.floor)return;
++  // Read by the post-accept callback from already committed state metadata.
++  // The finality argument is never supplied by a public RPC client.
++  // Bound ordinary catch-up to 128 heights per atomic pruning transaction.
++  const uint64_t next=std::min(target,policy.floor+128);
++  rocksdb::ReadOptions reads;reads.verify_checksums=true;reads.fill_cache=false;
++  std::unique_ptr<rocksdb::Iterator> it(_db->NewIterator(reads,_cf_meta));
++  rocksdb::WriteBatch batch;
++  for(it->Seek(height_key(policy.floor));it->Valid()&&it->key().starts_with(LITE_HEIGHT_PREFIX);it->Next())
++  {
++    const std::string key=it->key().ToString();
++    if(key.size()!=LITE_HEIGHT_PREFIX.size()+8+34)throw std::runtime_error("invalid Lite height index key");
++    uint64_t height=0;for(size_t i=LITE_HEIGHT_PREFIX.size();i<LITE_HEIGHT_PREFIX.size()+8;++i)height=(height<<8)|static_cast<unsigned char>(key[i]);
++    if(height>=next)break;
++    const std::string id=it->value().ToString();
++    if(id.size()!=34 || key.substr(LITE_HEIGHT_PREFIX.size()+8)!=id)throw std::runtime_error("invalid Lite height index identity");
++    koinos::block_store::block_record record;
++    if(!record.ParseFromString(get_record_bytes(id)) || record.block_id()!=id || record.block_height()!=height)
++      throw std::runtime_error("Lite height index does not match its block");
++    auto status=batch.Delete(_cf_blocks,id);if(!status.ok())throw std::runtime_error(status.ToString());
++    status=batch.Delete(_cf_meta,key);if(!status.ok())throw std::runtime_error(status.ToString());
++  }
++  if(!it->status().ok())throw std::runtime_error(it->status().ToString());
++  auto status=batch.Put(_cf_meta,LITE_FLOOR_KEY,std::to_string(next));if(!status.ok())throw std::runtime_error(status.ToString());
++  rocksdb::WriteOptions writes;writes.sync=true;
++  status=_db->Write(writes,&batch);if(!status.ok())throw std::runtime_error(status.ToString());
++}
++
+ // ---------------------------------------------------------------------------
+ // Broadcast handler
+ // ---------------------------------------------------------------------------
+@@ -483,6 +596,12 @@ void BlockStore::handle_block_accepted( const broadcast::block_accepted& ba )
+   try
+   {
+     add_block( req );
++    if(retained_from())
++    {
++      // The controller commits durable state before publishing block_accepted.
++      // Read that revision here, not a peer-supplied height or volatile head.
++      advance_lite_finality(storage::lite_durable_revision(_db));
++    }
+ 
+     if( ba.live() )
+     {
+diff --git a/src/block_store/block_store.hpp b/src/block_store/block_store.hpp
+index f7238bd..4e4a2d1 100644
+--- a/src/block_store/block_store.hpp
++++ b/src/block_store/block_store.hpp
+@@ -59,6 +59,11 @@ public:
+   /** Called by EventBus when a block is accepted. */
+   void handle_block_accepted( const broadcast::block_accepted& ba );
+ 
++  // Lite mode is explicit and is never enabled on an existing full archive.
++  void enable_lite( uint64_t retained_blocks );
++  void advance_lite_finality( uint64_t durable_finalized_height );
++  uint64_t retained_from() const;
++
+   // ── Lifecycle ──
+ 
+   /** Initialize metadata if not present (genesis). */
+@@ -102,6 +107,11 @@ private:
+ 
+   mutable std::shared_mutex _mutex;
+ 
++  struct LitePolicy { uint64_t window=0, floor=0; };
++  LitePolicy read_lite_policy() const;
++  static const std::string LITE_FLOOR_KEY;
++  static const std::string LITE_HEIGHT_PREFIX;
++  static std::string height_key( uint64_t height, const std::string& id = {} );
+   static const std::string META_KEY;
+ };
+ 
+diff --git a/src/storage/lite_state.hpp b/src/storage/lite_state.hpp
+new file mode 100644
+index 0000000..9af8ae8
+--- /dev/null
++++ b/src/storage/lite_state.hpp
+@@ -0,0 +1,27 @@
++#pragma once
++#include <map>
++#include <mutex>
++#include <stdexcept>
++#include <rocksdb/db.h>
++
++namespace koinos::node::storage {
++// The storage owner registers its existing durable-state handle. This adds no
++// fields to the public BlockStore/NodeConfig layouts, including for relinking.
++inline std::mutex lite_state_mutex;
++inline std::map<rocksdb::DB*, rocksdb::ColumnFamilyHandle*> lite_state_handles;
++inline void register_lite_state(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* state) {
++  std::lock_guard lock(lite_state_mutex);lite_state_handles[db]=state;
++}
++inline void unregister_lite_state(rocksdb::DB* db) {
++  std::lock_guard lock(lite_state_mutex);lite_state_handles.erase(db);
++}
++inline uint64_t lite_durable_revision(rocksdb::DB* db) {
++  std::lock_guard lock(lite_state_mutex);
++  auto found=lite_state_handles.find(db);
++  if(found==lite_state_handles.end())throw std::runtime_error("Lite durable state handle unavailable");
++  std::string revision;auto status=db->Get({},found->second,"revision",&revision);
++  if(!status.ok() || revision.size()!=8)throw std::runtime_error("Lite durable revision unavailable");
++  uint64_t height=0;for(unsigned char b:revision)height=(height<<8)|b;
++  return height;
++}
++}
+diff --git a/src/storage/rocksdb_manager.cpp b/src/storage/rocksdb_manager.cpp
+index c93ac75..9e9ae75 100644
+--- a/src/storage/rocksdb_manager.cpp
++++ b/src/storage/rocksdb_manager.cpp
+@@ -1,4 +1,5 @@
+ #include "storage/rocksdb_manager.hpp"
++#include "storage/lite_state.hpp"
+ 
+ #include <algorithm>
+ #include <chrono>
+@@ -465,6 +466,7 @@ void RocksDBManager::open( const std::filesystem::path& basedir, const NodeConfi
+ 
+   _db.reset( raw_db );
+   initialize_storage_metadata( basedir );
++  register_lite_state(_db.get(),handle(ColumnFamily::chain_metadata));
+ 
+   if( cfg.rocksdb_max_total_wal_size )
+     LOG( info ) << "[db] WAL flush trigger: " << cfg.rocksdb_max_total_wal_size
+@@ -476,6 +478,7 @@ void RocksDBManager::open( const std::filesystem::path& basedir, const NodeConfi
+ 
+ void RocksDBManager::close()
+ {
++  if(_db)unregister_lite_state(_db.get());
+   for( auto* handle: _handles )
+     delete handle;
+   _handles.clear();
+diff --git a/tests/storage/lite_retention_test.cpp b/tests/storage/lite_retention_test.cpp
+new file mode 100644
+index 0000000..b6efe52
+--- /dev/null
++++ b/tests/storage/lite_retention_test.cpp
+@@ -0,0 +1,79 @@
++#include "block_store/block_store.hpp"
++#include "storage/rocksdb_manager.hpp"
++#include <rocksdb/iterator.h>
++#include <filesystem>
++#include <iostream>
++#include <random>
++#include <stdexcept>
++
++using namespace koinos;
++using namespace koinos::node;
++namespace fs=std::filesystem;
++void check(bool ok,const char* why){if(!ok)throw std::runtime_error(why);}
++template<typename F>void rejects(F action,const char* why){bool failed=false;try{action();}catch(const std::exception&){failed=true;}check(failed,why);}
++std::string id(uint64_t height,char branch='a'){
++  std::string result="\x12\x20";result+=std::string(24,branch);
++  for(int shift=56;shift>=0;shift-=8)result.push_back(static_cast<char>(height>>shift));return result;
++}
++rpc::block_store::add_block_request request(uint64_t height,char branch='a'){
++  rpc::block_store::add_block_request r;auto* b=r.mutable_block_to_add();b->set_id(id(height,branch));
++  b->mutable_header()->set_height(height);b->mutable_header()->set_previous(id(height-1));
++  b->set_signature(std::string(256,'s'));r.mutable_receipt_to_add()->set_id(b->id());r.mutable_receipt_to_add()->set_height(height);return r;
++}
++struct Fixture{
++  fs::path path;storage::RocksDBManager manager;std::unique_ptr<node::block_store::BlockStore> store;
++  Fixture():path(fs::temp_directory_path()/ ("teleno-lite-retention-"+std::to_string(std::random_device{}()))){open();}
++  void open(){NodeConfig cfg;cfg.rocksdb_block_cache_mb=8;cfg.rocksdb_compression="none";manager.open(path,cfg);
++    store=std::make_unique<node::block_store::BlockStore>(manager.db(),manager.handle(storage::ColumnFamily::blocks),manager.handle(storage::ColumnFamily::block_meta));store->initialize();}
++  void close(){store.reset();manager.close();}
++  ~Fixture(){close();fs::remove_all(path);}
++  bool contains(uint64_t h,char branch='a'){
++    rpc::block_store::get_blocks_by_id_request r;r.add_block_ids(id(h,branch));r.set_return_block(true);r.set_return_receipt(true);
++    return store->get_blocks_by_id(r).block_items_size()==1;
++  }
++};
++void rolling_and_restart(){
++  Fixture f;f.store->enable_lite(64);
++  auto state=f.manager.handle(storage::ColumnFamily::chain_state);auto meta=f.manager.handle(storage::ColumnFamily::chain_metadata);
++  check(f.manager.db()->Put({},state,"unchanged","current consensus state").ok(),"state fixture write");
++  check(f.manager.db()->Put({},meta,"merkle_root","unchanged root").ok(),"root fixture write");
++  for(uint64_t h=1;h<=512;++h){f.store->add_block(request(h));if(h>10)f.store->advance_lite_finality(h-10);}
++  check(f.store->retained_from()==438,"finality determines retention boundary");
++  check(!f.contains(437)&&f.contains(438)&&f.contains(512),"old records removed; all needed recent records retained");
++  for(uint64_t h=438;h<=512;++h){
++    rpc::block_store::get_blocks_by_height_request r;r.set_head_block_id(id(512));r.set_ancestor_start_height(h);r.set_num_blocks(1);r.set_return_block(true);
++    auto result=f.store->get_blocks_by_height(r);check(result.block_items_size()==1&&result.block_items(0).block_height()==h,"ancestor lookup across power-of-two boundaries after pruning");
++  }
++  rpc::block_store::get_blocks_by_height_request old;old.set_head_block_id(id(512));old.set_ancestor_start_height(1);old.set_num_blocks(1);old.set_return_block(true);
++  check(f.store->get_blocks_by_height(old).block_items_size()==0,"unavailable history is an empty response");
++  rejects([&]{f.store->add_block(request(1));},"old body cannot grow back after pruning");
++  const auto floor=f.store->retained_from();f.store->advance_lite_finality(100);check(f.store->retained_from()==floor,"finality regression never removes additional data");
++  rejects([&]{f.store->advance_lite_finality(9000);},"finality above stored head rejected");
++  std::string value;check(f.manager.db()->Get({},state,"unchanged",&value).ok()&&value=="current consensus state","pruning preserves state bytes");
++  check(f.manager.db()->Get({},meta,"merkle_root",&value).ok()&&value=="unchanged root","pruning preserves root bytes");
++  f.close();f.open();check(f.store->retained_from()==438,"floor persists across restart before enabling services");f.store->enable_lite(64);
++  f.store->add_block(request(513));check(f.contains(513),"new block stores after restart");
++  f.store->add_block(request(512,'b'));check(f.contains(512,'b'),"recent fork is retained");
++  check(f.manager.db()->VerifyChecksum(rocksdb::ReadOptions{}).ok(),"database checksums after pruning and restart");
++}
++void existing_archive_refused(){Fixture f;f.store->add_block(request(1));rejects([&]{f.store->enable_lite(64);},"never auto-prune an existing full archive");check(f.contains(1),"archive unchanged after rejected conversion");}
++void malformed_floor_refused(){Fixture f;auto cf=f.manager.handle(storage::ColumnFamily::block_meta);check(f.manager.db()->Put({},cf,"lite.retained_from","-1").ok(),"floor corruption fixture");rejects([&]{f.store->enable_lite(64);},"malformed floor fails closed");}
++void corrupt_index_is_atomic(){
++  Fixture f;f.store->enable_lite(64);for(uint64_t h=1;h<=150;++h)f.store->add_block(request(h));
++  auto cf=f.manager.handle(storage::ColumnFamily::block_meta);std::string key="lite.height/";key+=std::string(7,'\0');key.push_back(2);key+=id(2);
++  check(f.manager.db()->Put({},cf,key,"wrong identity").ok(),"index corruption fixture");
++  rejects([&]{f.store->advance_lite_finality(149);},"corrupt height index fails before deletion batch commits");
++  check(f.store->retained_from()==1&&f.contains(1)&&f.contains(2),"failed pruning leaves floor and block bytes unchanged");
++}
++void accepted_uses_committed_revision(){
++  Fixture f;f.store->enable_lite(64);for(uint64_t h=1;h<=150;++h)f.store->add_block(request(h));
++  auto cf=f.manager.handle(storage::ColumnFamily::chain_metadata);std::string revision(8,'\0');revision[7]=100;
++  check(f.manager.db()->Put({},cf,"revision",revision).ok(),"committed revision fixture");
++  broadcast::block_accepted accepted;*accepted.mutable_block()=request(150).block_to_add();
++  f.store->handle_block_accepted(accepted);
++  check(f.store->retained_from()==36&&!f.contains(35)&&f.contains(36),"accepted height cannot substitute for durable finality");
++  f.close();f.open();
++  check(f.store->retained_from()==36,"Lite policy automatically reloads without configuration flags");
++  f.store->add_block(request(151));check(f.contains(151),"reopened Lite snapshot adds blocks without enable_lite call");
++}
++int main(){try{rolling_and_restart();existing_archive_refused();malformed_floor_refused();corrupt_index_is_atomic();accepted_uses_committed_revision();std::cout<<"PASS: Lite rolling retention, ancestor boundaries, restart, fork retention, state preservation, durable-finality callback and failed-prune atomicity\n";return 0;}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

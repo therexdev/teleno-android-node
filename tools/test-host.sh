@@ -27,6 +27,7 @@ java -jar "$TELENO_ECJ" -17 -nowarn -cp "$TELENO_JSON_JAR" -d "$TEST_DIR/classes
   "$ROOT/app/src/main/java/com/koinos/teleno/VaultClient.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/ProductionPermission.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/BurnKoin.java" \
+  "$ROOT/app/src/main/java/com/koinos/teleno/LiteRuntime.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/RecoveryPolicy.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/SnapshotPlan.java" \
   "$ROOT/app/src/main/java/com/koinos/teleno/SnapshotDownload.java" \

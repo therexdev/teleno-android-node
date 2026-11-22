@@ -28,7 +28,7 @@ public final class NodeService extends Service {
     private static final Object LOCK = new Object();
     private static volatile NodeService instance;
     static final class ViewState {
-        String phase = "Lite preview", detail = LitePreview.EXPLANATION, mode = "stopped", network = "harbinger";
+        String phase = LiteRuntime.ENABLED?"Stopped":"Lite preview", detail = LitePreview.EXPLANATION, mode = "stopped", network = "mainnet";
         long height, lib, freeBytes, headTime, sampleAt, localBlocks, runStartedAt, runEndedAt; boolean producerRunning; int peers = -1;
         ProductionStatus.Snapshot production = new ProductionStatus().snapshot();
         String producerAccount="",runNetwork="",runAccount="";
@@ -218,14 +218,14 @@ public final class NodeService extends Service {
             try {
                 NodeConfig.checkNetwork(chosen);
                 if(DOWNLOAD_CHAIN.equals(action)) {
-                    network=chosen;final boolean mobile=intent.getBooleanExtra("allow_mobile_download",false);requireEnvironment(false,mobile);verifyEngine(false);
+                    network=chosen;final boolean mobile=intent.getBooleanExtra("allow_mobile_download",false);requireEnvironment(false,mobile,true);verifyEngine(false);
                     wake.acquire(10*60*1000L);wakeAt=System.currentTimeMillis();
                     synchronized(LOCK){VIEW.downloading=true;VIEW.downloadPercent=-1;}
                     final long[] clock={0,0,System.currentTimeMillis(),0,0};final String[] previous={""};final double[] speed={0};
-                    SnapshotBootstrap.run(this,chosen,intent.getStringExtra("snapshot_id"),intent.getStringExtra("manifest_hash"),intent.getStringExtra("files_hash"),mobile,(phase,done,total,files,count)->{
+                    SnapshotDownload.Progress compactProgress=(phase,done,total,files,count)->{
                         if(epoch.get()!=request||stopRequested)throw new IOException("Download paused by you.");
                         long now=System.currentTimeMillis();
-                        if(now-clock[1]>5000){requireEnvironment(false,mobile);clock[1]=now;}
+                        if(now-clock[1]>5000){requireEnvironment(false,mobile,true);clock[1]=now;}
                         if(now-wakeAt>5*60*1000L){wake.acquire(10*60*1000L);wakeAt=now;}
                         if(now-clock[0]>700||!phase.equals(previous[0])) {
                             if("Downloading chain snapshot".equals(phase)&&phase.equals(previous[0])&&done>=clock[3]&&now>clock[2]) {
@@ -240,15 +240,11 @@ public final class NodeService extends Service {
                             status(phase,detail);
                             if(now-clock[4]>5000||percent==100){saveDownload(phase+"\n"+detail,percent);clock[4]=now;}
                         }
-                    });
+                    };
+                    LiteBundledSnapshot.restore(this,chosen,intent.getStringExtra("manifest_hash"),compactProgress);
                     saveDownload("Snapshot restored and verified. The observer will validate new blocks and catch up; production stays off.",100);
                     synchronized(LOCK){VIEW.downloading=false;}
-                    if(epoch.get()==request&&!stopRequested){
-                        if(NetworkPolicy.needsConsent(this)){
-                            saveDownload("Chain snapshot restored and verified. No new download is needed. Tap Start observer to review ongoing mobile data use, or connect Wi-Fi.",100);
-                            status("Chain ready","The existing chain is ready. Start observer to catch up; mobile node traffic requires a separate confirmation.");
-                        }else {requireEnvironment(false);rememberRun(null,request);launch(false,null,request);}
-                    }
+                    status("Compact chain ready","Checkpoint restored and verified. Use Start node to connect and catch up; mobile traffic will be reviewed separately.");
                 } else if(RECONNECT_STORAGE.equals(action)) {
                     network=chosen;status("Reconnecting existing chain","Checking the saved database and reconnecting it without deleting files or downloading a snapshot.");
                     NodeStorage.reconnect(this,chosen,intent.getStringExtra("volume"),intent.getStringExtra("generation"));
@@ -293,10 +289,11 @@ public final class NodeService extends Service {
     private void verifyEngine(boolean producer) throws Exception {
         if (!Arrays.asList(Build.SUPPORTED_64_BIT_ABIS).contains("arm64-v8a")) throw new IllegalStateException("This build needs a 64-bit ARM Android installation.");
         JSONObject info = new JSONObject(new String(NodeConfig.asset(this, "engine.json"), StandardCharsets.UTF_8));
-        if (!info.optBoolean("available")) throw new IllegalStateException("The node engine is missing. Install the full Teleno Node app to start the node.");
+        if(!info.optBoolean("liteStorageReady")||!"lite-v1".equals(info.optString("engineProfile")))throw new IllegalStateException("A complete compact-storage Lite runtime is required.");
+        if (!info.optBoolean("available")) throw new IllegalStateException("The node engine is missing. Install a complete Teleno Node Lite APK to start the node.");
         if (!NodeConfig.COMMIT.equals(info.getString("sourceCommit")) || !"arm64-v8a".equals(info.getString("abi"))) throw new IllegalStateException("The bundled node identity is incorrect.");
         if (producer && !ProductionReview.buildAllowsProduction(info.optBoolean("available"), info.optBoolean("productionQualified"), info.optBoolean("experimentalProductionEnabled")))
-            throw new IllegalStateException("This APK does not enable block production. Install the full Teleno Node app to use step 4.");
+            throw new IllegalStateException("This APK does not enable block production. Install a complete Teleno Node Lite APK to use step 4.");
         JSONObject artifacts = info.getJSONObject("sha256");
         for (String name : Arrays.asList("libteleno_node.so", "libteleno_runner.so", "libteleno_keys.so")) {
             File f = new File(getApplicationInfo().nativeLibraryDir, name);
@@ -307,7 +304,8 @@ public final class NodeService extends Service {
         }
     }
     private void requireEnvironment(boolean producer)throws Exception {requireEnvironment(producer,runMobile);}
-    private void requireEnvironment(boolean producer,boolean allowMobile) throws Exception {
+    private void requireEnvironment(boolean producer,boolean allowMobile) throws Exception {requireEnvironment(producer,allowMobile,false);}
+    private void requireEnvironment(boolean producer,boolean allowMobile,boolean restoring) throws Exception {
         NotificationManager notices = getSystemService(NotificationManager.class);
         NotificationChannel channel = notices.getNotificationChannel(CHANNEL);
         if (!notices.areNotificationsEnabled() || channel == null || channel.getImportance() == NotificationManager.IMPORTANCE_NONE) throw new IllegalStateException("Enable Teleno's local-node notifications in Android settings before starting.");
@@ -316,8 +314,9 @@ public final class NodeService extends Service {
         NodeStorage.checkMounted(this,network);
         long free = NodeStorage.free(this,network);
         synchronized (LOCK) { VIEW.freeBytes = free; }
-        if (free < 2L * 1024 * 1024 * 1024) throw new Pause("Free at least 2 GiB before starting. The full chain needs additional growing storage.");
+        if (free < 2L * 1024 * 1024 * 1024) throw new Pause("Free at least 2 GiB before starting. Current chain state and temporary compaction need growing storage.");
         if (Build.VERSION.SDK_INT >= 29 && getSystemService(PowerManager.class).getCurrentThermalStatus() >= PowerManager.THERMAL_STATUS_SEVERE) throw new Pause("The device is too hot. Let it cool before restarting the observer.");
+        if(restoring)return;
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
         if (nc == null || !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) throw new Disconnected();
@@ -391,6 +390,7 @@ public final class NodeService extends Service {
             })) return;
         if (epoch.get() != request || stopRequested) return;
         NodeStorage.ensureReady(this,network);
+        LiteBundledSnapshot.requireRestored(this,network);
         File config = NodeConfig.prepare(this, network, producer ? account : null);
         File secret = NodeConfig.secretFile(this, network);
         NodeConfig.clearTransientKey(this, network);

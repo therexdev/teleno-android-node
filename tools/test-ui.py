@@ -16,6 +16,7 @@ parser.add_argument('--deps', type=Path, required=True)
 parser.add_argument('--ecj', type=Path, required=True)
 parser.add_argument('--classes', type=Path, default=root / 'build/apk/classes')
 parser.add_argument('--output', type=Path, default=root / 'evidence/ui')
+parser.add_argument('--test-class',default='LiteUiTest',choices=['LiteUiTest','LiteRuntimeUiTest'])
 args = parser.parse_args()
 deps = args.deps.resolve()
 build = root / 'build/ui-tests'
@@ -49,9 +50,9 @@ compile_classpath = os.pathsep.join(str(p.resolve()) for p in
                                     compile_jars + [compiled, args.classes])
 subprocess.run(['java', '-jar', str(args.ecj.resolve()), '-17', '-nowarn',
                 '-cp', compile_classpath, '-d', str(compiled),
-                str(root / 'tests/ui/LiteUiTest.java')], check=True)
+                str(root / ('tests/ui/'+args.test_class+'.java'))], check=True)
 subprocess.run(['java', '-Xmx2g',
                 '-Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2',
                 '-Dteleno.ui.output=' + str(args.output.resolve()),
                 '-cp', classpath, 'org.junit.runner.JUnitCore',
-                'com.koinos.teleno.LiteUiTest'], check=True)
+                'com.koinos.teleno.'+args.test_class], check=True)

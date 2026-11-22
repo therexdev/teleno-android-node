@@ -1,3 +1,5 @@
+> For Lite 0.2.0, start with [BUILDING_LITE.md](BUILDING_LITE.md). The recipe below documents the inherited full cross-build dependencies and the earlier engine-free foundation. Engine/snapshot/evidence inputs are now accepted together by the Lite APK builder.
+
 # Building Teleno Node Lite
 
 Build in the separate Lite checkout, not the standard app checkout. Use Java 17+,

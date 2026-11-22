@@ -1,0 +1,10 @@
+test_corrupt_input_is_rejected_before_open (__main__.SnapshotTest.test_corrupt_input_is_rejected_before_open) ... ok
+test_missing_sst_never_becomes_empty_state (__main__.SnapshotTest.test_missing_sst_never_becomes_empty_state) ... ok
+test_roundtrip_state_and_bounded_history (__main__.SnapshotTest.test_roundtrip_state_and_bounded_history) ... ok
+test_unverified_wal_and_existing_output_rejected (__main__.SnapshotTest.test_unverified_wal_and_existing_output_rejected) ... ok
+test_wrong_network_fails_without_output (__main__.SnapshotTest.test_wrong_network_fails_without_output) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.137s
+
+OK

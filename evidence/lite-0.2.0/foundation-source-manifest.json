@@ -1,0 +1,87 @@
+{
+  "backup_id": "20261121T065436Z-ms-1795244076231-files-502",
+  "created_at": "20261121T065546Z",
+  "format": "teleno-native-rocksdb-snapshot",
+  "node": {
+    "name": "teleno_node",
+    "version": "1.3.0-dev.0+d3cfb94455da4a472f651eb4239abbc289e74225-dirty"
+  },
+  "public_bootstrap": {
+    "chain_id": "0x1220592bf18654fd07fdf5d500cde3e8402ecf7f81fa5dde8f14527b08bba8805f48",
+    "network": "mainnet",
+    "producer_mode": false,
+    "promoted_at": "20261121T065735Z",
+    "public_base_url": "https://seed.koinosfoundation.org/backups/prodnet/teleno-bootstrap",
+    "restore_space": {
+      "archive_bytes": 0,
+      "minimum_target_free_bytes": 31133503679,
+      "object_download_bytes": 30999285951,
+      "recommended_target_free_bytes": 41870921919,
+      "restored_database_bytes": 30998634844,
+      "runtime_files_bytes": 651107
+    },
+    "sanitized_config": true,
+    "source": {
+      "backup_id": "20261121T065436Z-ms-1795244076231-files-502",
+      "chain_id": "0x1220592bf18654fd07fdf5d500cde3e8402ecf7f81fa5dde8f14527b08bba8805f48",
+      "created_at": "20261121T065546Z",
+      "head_height": 41258090,
+      "head_height_kind": "durable_state_revision",
+      "highest_stored_height": 41258150,
+      "highest_stored_id": "0x1220e2250f485a8acd7e13356339e0c52bb6caa4397f85d56fce75e9052f6e70d6f8",
+      "historical_replay_validated": false,
+      "identity_status": "checkpoint_verified",
+      "identity_version": 1,
+      "lib_height": 0,
+      "lib_height_known": false,
+      "node_id": "teleno-prodnet-public-bootstrap",
+      "node_version": "1.3.0-dev.0+d3cfb94455da4a472f651eb4239abbc289e74225-dirty",
+      "state_id": "0x1220d9ac9f820b0d0bdb5a8091fd0c8cf937f9e513067d4e0c5e83a91355d4cdae8d",
+      "state_merkle_root": "0x122084544b4436efca00025168d69cf66b31e9ef9b9bd1fc02f1719a6556d2309d98",
+      "state_revision": 41258090,
+      "storage_layout": "unified"
+    },
+    "source_backup_id": "20261121T065436Z-ms-1795244076231-files-502",
+    "version": 1
+  },
+  "repository": {
+    "base_url": "https://seed.koinosfoundation.org/backups/prodnet/teleno-bootstrap",
+    "type": "public-bootstrap-object-store"
+  },
+  "restore": {
+    "force_block_producer_disabled_on_first_start": true,
+    "requires_node_stop": true,
+    "start_as_observer_first": true
+  },
+  "sizes": {
+    "archive_bytes": 0,
+    "minimum_target_free_bytes": 31133503679,
+    "object_download_bytes": 30999285951,
+    "recommended_target_free_bytes": 41870921919,
+    "restored_database_bytes": 30998634844,
+    "runtime_files_bytes": 651107
+  },
+  "snapshot": {
+    "file_count": 505,
+    "object_count": 505,
+    "total_bytes": 30999285951
+  },
+  "source": {
+    "chain_id": "0x1220592bf18654fd07fdf5d500cde3e8402ecf7f81fa5dde8f14527b08bba8805f48",
+    "head_height": 41258090,
+    "head_height_kind": "durable_state_revision",
+    "highest_stored_height": 41258150,
+    "highest_stored_id": "0x1220e2250f485a8acd7e13356339e0c52bb6caa4397f85d56fce75e9052f6e70d6f8",
+    "historical_replay_validated": false,
+    "identity_status": "checkpoint_verified",
+    "identity_version": 1,
+    "lib_height_known": false,
+    "network": "mainnet",
+    "node_id": "public-bootstrap-mainnet",
+    "state_id": "0x1220d9ac9f820b0d0bdb5a8091fd0c8cf937f9e513067d4e0c5e83a91355d4cdae8d",
+    "state_merkle_root": "0x122084544b4436efca00025168d69cf66b31e9ef9b9bd1fc02f1719a6556d2309d98",
+    "state_revision": 41258090,
+    "storage_layout": "unified"
+  },
+  "version": 1
+}

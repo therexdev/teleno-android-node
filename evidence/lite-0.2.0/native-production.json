@@ -1,0 +1,14 @@
+{
+  "engine_sha256": "36dae70b7fa3bbba95140010341d0d92424666c0c0fad9d40746525a548bbbd6",
+  "profile": "lite-v1",
+  "emulated_arm64_restore": true,
+  "matching_reference_roots_through": 152,
+  "actual_pruned_from": 26,
+  "checkpoint_revision": 90,
+  "compact_restore_and_catchup": true,
+  "isolated_federated_production": true,
+  "durable_restart": true,
+  "physical_android_device_tested": false,
+  "mainnet_pob_production_tested": false,
+  "runtime": "QEMU AArch64, AOSP Android libc, stderr-only liblog shim; unused libandroid shim; no peer network"
+}

@@ -1,49 +1,67 @@
-# Teleno Node Lite
+# Teleno Node Lite 0.2.0 — experimental compact miner
 
-A separate Android application for developing a compact-storage, on-phone Koinos
-miner with KOIN Vault approvals. It is based on Teleno Node 0.3.12 and is kept on
-its own `lite/foundation-0.1.0` branch. The standard application and working branch
-are unchanged.
+An independent Android application (`com.koinos.teleno.lite`) for local Koinos
+validation and mining. It can be installed alongside standard Teleno Node. It
+uses separate app storage, encrypted wallet/key aliases, notifications and ports
+(RPC 28085, P2P 28888). The standard app and its branch are unchanged.
 
-## Current build: 0.1.0 foundation preview
+## Setup
 
-This APK is installable alongside Teleno Node. It provides the inherited dashboard,
-wallet connection and explicit wallet review flows. **Compact mining is not ready.**
-Start, restore/download, maintenance and recovery paths are blocked in this preview.
-It does not include the standard node engine or download the full chain database.
-A wallet burn does not enable Lite mining; every wallet transaction still needs
-explicit approval in Vault.
+1. Connect the producer account to KOIN Vault. An existing valid connection is reused.
+2. Use existing VHP, or review a KOIN-to-VHP burn and the resulting bounded PoB
+   allowance in Vault. Register the device's block-signing key. These are explicit
+   wallet approvals; the funds key never enters Lite. Burn review can occur while
+   the node runs.
+3. Restore the compact checkpoint included in the APK. It needs no additional
+   network download or Wi-Fi. Every copied file is checked against its pinned
+   SHA-256. Existing chain data is retained during an explicit replacement.
+4. Tap **Start node** on Setup or the dashboard. The observer starts, catches up,
+   checks local readiness and the reviewed producer permission, then starts PoB.
 
-| Boundary | Teleno Node | Teleno Node Lite |
-| --- | --- | --- |
-| Android application ID | `com.koinos.teleno` | `com.koinos.teleno.lite` |
-| Launcher label | Teleno Node | Teleno Node Lite |
-| Icon | Green T | Blue T with Lite badge |
-| RPC port | 18085 | 28085 |
-| P2P port | 18888 | 28888 |
-| Keys, sessions, preferences and app data | Standard app sandbox | Lite app sandbox |
-| Chain directory name | `teleno-chain` | `teleno-lite-chain` |
+Charging is optional. Foreground execution, wake locks and recovery are inherited
+from the existing app. Android/OEM process limits, lack of connectivity, severe
+heat and low storage can still interrupt a phone; this is not a 100% uptime claim.
 
-The packages do not share a UID, chain database, signing key or encrypted Vault
-session. Lite does not migrate or reconnect the standard app's files. Installing
-or removing Lite does not replace or uninstall Teleno Node. The same signing
-certificate may sign both packages; their application IDs remain independent.
-Physical-device co-installation is still to be tested.
+## Storage
 
-The Java/JNI namespace intentionally remains `com.koinos.teleno` for bridge ABI
-compatibility. Android component names are fully qualified and the independent
-installation identity is `com.koinos.teleno.lite`.
+The bundled Mainnet checkpoint is **60,592,409 bytes** (about 61 MB), at durable
+revision 41,258,090. The signed APK is about 71 MB. Keep a **2 GiB free-space
+reserve** for chain growth and compaction. These are current measurements, not a
+permanent storage cap.
 
-## Storage work
+The checkpoint retains all current consensus state and 4,097 recent block
+records. The native engine prunes older block bodies/receipts after durable
+finality, preserves positional ancestor navigation, and atomically advances its
+retention floor. Optional account/transaction/contract-history indexes are off.
+Wallet history can use the existing labelled public read source.
 
-The native engine requires safe history pruning, preservation of required
-ancestor metadata, a compact bootstrap snapshot, and reference-node validation.
-A minimum storage requirement has not been measured. See the concrete
-[compact-mining design and acceptance criteria](docs/LITE_STORAGE_DESIGN.md).
+This is a trusted Foundation checkpoint bootstrap, not historical replay or a
+proof of all past consensus. The phone validates subsequent blocks locally. Old
+block ranges are unavailable from Lite; it is not an archival node. The snapshot
+exporter creates a new database and does not convert or delete a full archive.
 
-## Build and test
+Ongoing peer traffic has no fixed total size. Mobile/metered use requires the
+existing per-run warning and consent. The bundled restore itself works offline.
+The current compact checkpoint is Mainnet-only; Harbinger compact restore is not
+provided in this build.
 
-See [build instructions](docs/BUILDING.md) and [Lite validation](tests/ui/README.md).
-The signing key is never included in source archives. Android 9+, ARM64.
-Do not install historical standard APKs from inherited `releases/` directories
-when testing Lite; only `releases/lite/0.1.0/` contains this app's release metadata.
+## Validation and limits
+
+The exact ARM64 engine ran under QEMU with Android libc. It matched a reference
+node through 150 submitted, signed private-chain blocks, pruned old data, restored
+and caught up from a compact checkpoint, then produced two federated test blocks.
+The reference accepted them with matching state roots through height 152. A
+further durable restart passed. The same engine restored the Mainnet checkpoint
+with its expected chain ID and state root, resolved KOIN and executed a local
+KOIN contract read. Native retention, corrupt-index atomicity, fork retention,
+snapshot failure checks, wallet fixtures and Android UI tests also passed.
+
+Physical-device installation/co-installation, Android Keystore behavior,
+foreground endurance, live P2P catch-up, real Vault approvals and **Mainnet PoB
+block production remain untested**. `productionQualified` remains false. This
+APK explicitly enables experimental production for phone testing. No live wallet
+transaction was sent as part of these tests.
+
+See [the validation record](evidence/lite-0.2.0/VALIDATION.md) and
+[build instructions](docs/BUILDING_LITE.md). The 0.1.0 foundation preview can still
+be built by omitting engine/snapshot inputs; it remains unable to start a node.

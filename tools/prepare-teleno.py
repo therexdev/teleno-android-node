@@ -43,8 +43,19 @@ hook = '''if(ANDROID)
 endif()
 '''
 recipe.write_text(text.replace(anchor, anchor + hook))
+lite = json.loads((ROOT / 'native/lite-engine.json').read_text())
+patch = ROOT / 'native/lite-engine.patch'
+if lite['upstreamCommit'] != COMMIT or hashlib.sha256(patch.read_bytes()).hexdigest() != lite['patchSha256']:
+    raise SystemExit('Lite engine patch does not match its source lock.')
+subprocess.run(['git', '-C', str(output), 'apply', '--check', str(patch)], check=True)
+subprocess.run(['git', '-C', str(output), 'apply', str(patch)], check=True)
+for rel, expected in lite['sourceSha256'].items():
+    if hashlib.sha256((output/rel).read_bytes()).hexdigest()!=expected:
+        raise SystemExit('Prepared Lite source hash mismatch: '+rel)
 manifest = {
     'upstreamCommit': COMMIT,
+    'engineProfile': 'lite-v1',
+    'litePatchSha256': lite['patchSha256'],
     'archiveSha256': hashlib.sha256(archive).hexdigest(),
     'changedFiles': [{
         'path': 'cmake/TelenoProtobuf.cmake',

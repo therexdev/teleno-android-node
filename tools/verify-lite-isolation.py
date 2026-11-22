@@ -42,12 +42,21 @@ for filename,token in [('KeyVault.java','teleno-lite-block-signer-v1-'),('VaultS
  assert token not in (args.standard_root/'app/src/main/java/com/koinos/teleno'/filename).read_text()
 bt=next(args.sdk/'build-tools'/d for d in ['36.0.0','android-16'] if (args.sdk/'build-tools'/d/'aapt2').exists())
 badging=subprocess.check_output([str(bt/'aapt2'),'dump','badging',str(args.apk)],text=True)
-assert "name='com.koinos.teleno.lite' versionCode='1' versionName='0.1.0'" in badging
+assert "name='com.koinos.teleno.lite' versionCode='"+manifest.attrib[android+'versionCode']+"' versionName='"+manifest.attrib[android+'versionName']+"'" in badging
 assert "application-label:'Teleno Node Lite'" in badging
 assert "launchable-activity: name='com.koinos.teleno.MainActivity'" in badging
 with zipfile.ZipFile(args.apk) as archive:
- assert 'lib/arm64-v8a/libteleno_node.so' not in archive.namelist()
  info=json.loads(archive.read('assets/engine.json'))
  assert info['applicationId']=='com.koinos.teleno.lite'
- assert not any(info[k] for k in ['available','productionQualified','experimentalProductionEnabled','liteStorageReady'])
-print(json.dumps({'package':manifest.attrib['package'],'standard_package':standard.attrib['package'],'lite_ports':ports[1],'separate_identity':True,'standard_engine_bundled':False,'compact_mining_ready':False,'device_installation_tested':False},indent=2))
+ assert not info['productionQualified']
+ if info['available']:
+  import hashlib
+  assert info['engineProfile']=='lite-v1' and info['liteStorageReady']
+  assert hashlib.sha256(archive.read('lib/arm64-v8a/libteleno_node.so')).hexdigest()==info['sha256']['libteleno_node.so']
+  snapshot=json.loads(archive.read('assets/compact/lite-manifest.json'))
+  assert snapshot['format']=='teleno-lite-state-snapshot' and snapshot['download_bytes']<1024**3
+  for row in snapshot['files']:assert hashlib.sha256(archive.read('assets/compact/'+row['path'])).hexdigest()==row['sha256']
+ else:
+  assert 'lib/arm64-v8a/libteleno_node.so' not in archive.namelist()
+  assert not any(info[k] for k in ['experimentalProductionEnabled','liteStorageReady'])
+print(json.dumps({'package':manifest.attrib['package'],'standard_package':standard.attrib['package'],'lite_ports':ports[1],'separate_identity':True,'lite_engine_bundled':info['available'],'experimental_compact_mining':info['experimentalProductionEnabled'],'device_installation_tested':False},indent=2))

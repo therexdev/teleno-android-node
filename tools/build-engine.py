@@ -22,6 +22,9 @@ source, koinos, aux, deps, build = [getattr(a, x).resolve() for x in ('source', 
 meta = json.loads((source / 'ANDROID_BUILD_SOURCE.json').read_text())
 if meta['upstreamCommit'] != '2c11229267cff2f9ee39ed8e56ab70af391d85ce':
     raise SystemExit('Expected the pinned source prepared by prepare-teleno.py.')
+lock=json.loads((ROOT/'native/lite-engine.json').read_text())
+if meta.get('engineProfile')!='lite-v1' or meta.get('litePatchSha256')!=lock['patchSha256']:
+    raise SystemExit('Prepare the locked Lite source before building its engine.')
 if not os.environ.get('TELENO_ANDROID_NDK'):
     raise SystemExit('Set TELENO_ANDROID_NDK to r27d.')
 thirdparty = deps / 'cpp-libp2p-thirdparty-include'

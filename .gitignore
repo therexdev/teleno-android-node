@@ -5,3 +5,6 @@ native/work/
 app/src/main/jniLibs/
 *.jks
 *.keystore
+
+__pycache__/
+*.pyc

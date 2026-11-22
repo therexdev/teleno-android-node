@@ -1,0 +1,17 @@
+{
+  "profile": "lite-v1",
+  "upstreamCommit": "2c11229267cff2f9ee39ed8e56ab70af391d85ce",
+  "lite_patch_sha256": "fe445a9f7a7fc4cdb6464a21bc3f0ce5b84ba0ddf7c4068d8d26d931290501e9",
+  "replaced_inputs": [
+    {
+      "file": "inputs/98efe7b537bdfad7-libkoinos_storage_lib.a",
+      "sha256": "0a53885064099f8d6c06964212abd504826c7b277727090e7746bd851eef0cd7"
+    },
+    {
+      "file": "inputs/a2956749774d512f-libkoinos_block_store_lib.a",
+      "sha256": "e24aedc5618d7b2d40d275ae3c3d8e84eb3792064f9df972bac23ad1d980d281"
+    }
+  ],
+  "engine_sha256": "36dae70b7fa3bbba95140010341d0d92424666c0c0fad9d40746525a548bbbd6",
+  "runtimeQualified": false
+}

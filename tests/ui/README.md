@@ -25,3 +25,10 @@ durable saved requests and no automatic resend; no live transaction is sent.
 
 Android simulation and manifest checks are not a physical-device co-installation,
 Android Keystore UID-isolation test or compact-mining endurance test.
+
+## Enabled 0.2.0 runtime
+
+After building the experimental APK classes, use `--test-class LiteRuntimeUiTest`.
+This exercises the enabled four-step UI, bundled manifest pin, path/network/window
+rejection, required compact restore and burn review without stopping a miner.
+The original suite is still used for builds that omit the runtime inputs.

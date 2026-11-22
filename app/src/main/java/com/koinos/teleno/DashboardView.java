@@ -102,7 +102,7 @@ final class DashboardView extends LinearLayout {
         changed(block,scoped&&node.hasSample?NumberFormat.getIntegerInstance().format(node.height):"—");block.setTextColor(fresh?INK:MUTED);
         changed(peers,scoped&&node.peers>=0?Integer.toString(node.peers):"—");changed(produced,scoped?Long.toString(node.localBlocks):"—");
         changed(toggle,node.active?"Stop node":node.busy?"Stop task":"Start node");toggle.setEnabled(node.active||node.busy?canStop:canStart);
-        toggle.setContentDescription(node.active?"Stop the local node":node.busy?"Stop the current node task":"Show Teleno Node Lite preview status. Compact mining is not available yet.");
+        toggle.setContentDescription(node.active?"Stop the local node":node.busy?"Stop the current node task":(LiteRuntime.ENABLED?"Start the compact local node and continue setup.":"Show Teleno Node Lite preview status. Compact mining is not available yet."));
         WalletReader.Balance b=data.balance;boolean saved=b!=null&&(!data.balanceError.isEmpty()||now-b.at>90000);
         changed(koin,b==null?"—":WalletReader.compact(b.koin));changed(vhp,b==null?"—":WalletReader.compact(b.vhp));changed(balanceState,saved?"Saved":b==null?"Awaiting wallet":"");
         int percent=b==null?0:WalletReader.percent(b.mana,b.koin);changed(mana,b==null?"—":percent+"%");manaBar.setProgress(percent,foreground&&ValueAnimator.areAnimatorsEnabled());

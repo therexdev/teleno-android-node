@@ -1,82 +1,79 @@
-# Teleno Node Lite: compact local mining
+# Compact local mining design
 
-The goal is an independently installed Android app that validates and produces
-Koinos blocks on the phone with KOIN Vault approvals and substantially less
-retained storage. The miner remains local. This is not remote mining or a public
-RPC dashboard presented as a miner.
+Lite retains current consensus state and recent block bodies/receipts on the
+phone. It validates new blocks and performs local block production. It does not
+present a remote RPC dashboard as a miner. Android identity, private keys,
+sessions, notifications, chain storage and listening ports are isolated from the
+standard application.
 
-## Foundation delivered in 0.1.0
+The native base is `koinos/teleno@2c11229267cff2f9ee39ed8e56ab70af391d85ce`.
+The public Foundation checkpoint measured 30,924,289,067 bytes of block SSTs and
+54,385,168 bytes of state SSTs. Those SST measurements include older versions;
+they are not live-state size guarantees. The exported live compact database,
+recent history and genesis total about 61 MB. Its exact manifest is recorded in
+`evidence/lite-0.2.0/compact-snapshot-manifest.json`.
 
-The application ID is `com.koinos.teleno.lite`, distinct from standard
-`com.koinos.teleno`. It uses a distinct launcher icon, Vault app name, encrypted
-key/session aliases, chain directory name and RPC/P2P ports 28085/28888. Android
-assigns app-private storage independently. No shared UID, cross-app data provider,
-standard-app migration or shared chain directory is configured.
+## Policy and pruning
 
-The Java/JNI namespace remains `com.koinos.teleno` to reuse the native bridge
-without modifying its ABI. Fully qualified Android components and AAPT's custom
-resource namespace make this independent of the Android installation ID.
+`block_meta/lite.retained_from` and `block_meta/lite.retention_blocks` explicitly
+identify a Lite database. They are validated and reloaded on startup. Ordinary
+full archives have neither key and are never automatically converted. Enabling
+Lite on a populated full archive is rejected; export to a separate database.
 
-This preview supports the wallet UI, explicit Vault pairing and reviewed wallet
-requests. It bundles the existing native bridge and supervisor, but no standard
-node engine. Mining, observer startup, restore/download, chain maintenance and
-recovery are blocked at the service boundary. The UI states that compact mining
-is unavailable. A burn review explicitly says a burn does not enable Lite mining.
-The build rejects both a supplied full engine and production enablement.
+Every new block and its ordered height index are written atomically. After
+acceptance, the storage owner supplies the already committed `chain_metadata`
+revision. The retention floor is that durable height minus the configured window
+(4,096 for the bundled checkpoint). Each pruning transaction advances at most
+128 heights, deleting old indexed block records and updating the floor in one
+synchronous cross-CF WriteBatch. A malformed record/index or iterator failure
+aborts before any deletion commits. Consensus-state CFs are never pruned by this
+policy. Recent forks remain available; forks below durable consensus finality
+are outside the supported recovery horizon.
 
-Standard APKs, source and the existing working branch remain unchanged. Both
-packages can be installed together; physical-device co-installation has not been
-tested in this environment. A shared producer must never be run twice.
+Ancestor records contain positional power-of-two skip pointers. Slots below the
+floor are preserved as empty values; supported reads at or above the floor never
+select those slots. Queries for removed historical heights return unavailable
+history. New blocks can still build their recent ancestor navigation, including
+at powers of two. Native tests exercise this through height 512 and real native
+consensus comparison exercises a boundary at height 128 after pruning.
 
-## Engine work required
+The implementation preserves the public C++ object layouts and virtual ABI for
+relinking the published Android materials. The storage owner registers its
+existing durable metadata handle and unregisters before closing it. No separate
+configuration flag can accidentally disable a restored database's Lite policy.
 
-The inherited engine source pin is
-`koinos/teleno@2c11229267cff2f9ee39ed8e56ab70af391d85ce`.
-`RocksDBManager::column_family_stats()` reports per-family SST and live data
-estimates. Measure `chain_state`, `chain_metadata`, `blocks`, `block_meta`,
-`transaction_index` and `account_history` on a representative Mainnet database.
-SST totals, temporary compaction space and steady-state growth must all be
-included. The full snapshot's aggregate size is not a compact-state size estimate.
+## Export and restore
 
-The block store embeds ancestor skip-list metadata in block records. Adding a
-block consults historical ancestors and rejects an insertion if required records
-are missing. Deleting old records wholesale would therefore break normal block
-storage. A pruning design must preserve or replace that metadata, not just delete
-old files or disable the block store.
+The offline exporter validates source hashes, genesis-derived chain ID, durable
+state/header/ID, recent block header hashes, parent continuity and receipt roots.
+It copies all current consensus state byte for byte, verifies complete key/value
+hashes, drops optional history indexes and reconstructs recent skip pointers.
+The exported archived head is the durable state root. An immutable source view
+prevents tool metadata writes from touching the checkpoint. An incomplete export
+is removed and never published as complete.
 
-Retain current consensus state, recent block bodies/receipts, required ancestor
-metadata and all material needed by the durable state/indexer and supported fork
-recovery. Derive the retention boundary from consensus finality and actual read
-dependencies. Disable optional history indexing for new Lite databases; removing
-previously populated indexes is a separate checked migration.
+The signed experimental APK includes its checkpoint and pins the manifest hash.
+Restore copies into a new inactive storage generation, checks every file, writes
+an explicit app-side Lite marker, then activates through the existing journaled
+storage switch. Prior chain data is retained until the new observer advances and
+the user explicitly chooses cleanup. Once activation journaling begins, recovery
+owns the stage. Startup requires a restored Lite marker and cannot silently sync
+an unbounded full archive from genesis.
 
-Create a versioned Lite snapshot format and dedicated publication channel.
-Do not download the standard snapshot and prune it afterward on a small phone.
-Restore must check network identity, snapshot identity/checksums, state consistency,
-storage requirements and observer progress before any block production. Clarify
-the trust/checkpoint assumptions of snapshot bootstrapping.
+The compact restore is local and needs no additional network or Wi-Fi. Ongoing
+peer traffic still requires mobile/metered consent. The current bundled snapshot
+is Mainnet-only. Publishing a separate downloadable rolling compact snapshot
+channel remains future work; no full snapshot is downloaded as a fallback.
 
-P2P must honestly handle unavailable old block ranges and still discover/follow
-the chain. Missing old history cannot be mistaken for a corrupt current state.
-The node must remain able to validate new blocks and build/sign correct blocks.
-Wallet/reward history can use labelled public RPC reads; production validation
-must continue to use verified local state.
+## Validation boundary
 
-## Acceptance before enabling compact mining
+See `evidence/lite-0.2.0/VALIDATION.md` for exact results. The ARM64 engine restored
+Mainnet state and executed a KOIN contract read. An isolated private federated
+chain matched reference roots before/after pruning, compact restore, catch-up,
+production and restart. This establishes an experimental native test build.
 
-1. Measure database size and peak restore/compaction space on a fresh compact
-   bootstrap, including continued growth. Do not promise a fixed GB target yet.
-2. Compare state roots and block acceptance with the reference node at the same
-   chain checkpoints, before and after pruning.
-3. Test block insertion across ancestor skip-list boundaries after old payloads
-   are pruned, fork/reorg handling, and a restart during interrupted pruning.
-4. Test restore, observer catch-up and durable restart without the removed history.
-5. Exercise block production on an isolated test network with matching registered
-   device key and explicit wallet approvals; never auto-burn or auto-resend.
-6. Test both Android packages installed together, isolated private/SD data,
-   independent sessions, notifications and Stop controls. Use different producers
-   for concurrent mining tests.
-
-Only after those checks should a Lite runtime/snapshot be enabled. Engine metadata
-alone is not proof of qualification. The standard app must not be changed to make
-the Lite prototype pass.
+Physical Android execution, Keystore isolation/co-installation, live P2P peer
+acquisition/catch-up, Vault passkey/deep-link approvals, sustained thermal and
+background behavior, long-run storage growth and Mainnet PoB production remain
+required for production qualification. The Android package explicitly retains
+`productionQualified=false`; experimental production is separately enabled.

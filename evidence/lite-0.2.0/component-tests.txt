@@ -1,0 +1,2 @@
+PASS: Lite rolling retention, ancestor boundaries, restart, fork retention, state preservation, durable-finality callback and failed-prune atomicity
+Host component build used RocksDB 9.10 / protobuf 3.21.12; the actual ARM64 node used its original pinned RocksDB 8.8.1 / owned protobuf 3.17 runtime.
