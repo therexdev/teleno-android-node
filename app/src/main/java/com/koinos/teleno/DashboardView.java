@@ -95,12 +95,14 @@ final class DashboardView extends LinearLayout {
         boolean healthy=fresh&&node.ready&&accountMatches&&(!producer||node.production.advancing(elapsed));
         changed(clock,android.text.format.DateFormat.getTimeFormat(activity).format(new Date(now)));changed(date,new SimpleDateFormat("EEE, MMM d",Locale.getDefault()).format(new Date(now)));
         changed(network,"mainnet".equals(selectedNetwork)?"MAINNET":"HARBINGER");
-        changed(badge,healthy?"●  HEALTHY · "+(producer?"PRODUCER":"OBSERVER"):node.active?"●  "+(!fresh?"STATUS CHECK":!node.ready?"SYNCING":"NEEDS ATTENTION"):node.busy?"●  WORKING":"○  STOPPED");
+        changed(badge,healthy?"●  HEALTHY · "+(producer?"PRODUCER":"OBSERVER"):node.active?"●  "+(node.readinessState==Readiness.State.NETWORK?"NETWORK CHECK":!fresh?"STATUS CHECK":!node.ready?node.readinessState.badge:"NEEDS ATTENTION"):node.busy?"●  WORKING":"○  STOPPED");
         badge.setTextColor(healthy?TEAL:node.active||node.busy?AMBER:MUTED);
-        changed(phase,node.active?!fresh?"Waiting for fresh status":!accountMatches?"Producer account differs":!node.ready?"Catching up to the chain":producer?node.production.title(elapsed):"Validating the chain":node.busy?node.phase:"Ready when you are");
+        changed(phase,node.active?node.readinessState==Readiness.State.NETWORK?node.readinessState.title:!fresh?"Waiting for fresh status":!accountMatches?"Producer account differs":!node.ready?node.readinessState.title:producer?node.production.title(elapsed):"Validating the chain":node.busy?node.phase:"Ready when you are");
         halo.live(healthy);halo.working(node.active||node.busy);halo.foreground(foreground);
         changed(block,scoped&&node.hasSample?NumberFormat.getIntegerInstance().format(node.height):"—");block.setTextColor(fresh?INK:MUTED);
-        changed(peers,scoped&&node.peers>=0?Integer.toString(node.peers):"—");changed(produced,scoped?Long.toString(node.localBlocks):"—");
+        changed(peers,scoped&&node.peerCountPending?"Live":scoped&&node.peers>=0?Integer.toString(node.peers):"—");
+        peers.setContentDescription(node.peerCountPending?"A newer native connection event confirms a peer; the exact count is pending.":"Last reported connected peers: "+(node.peers<0?"unknown":node.peers));
+        changed(produced,scoped?Long.toString(node.localBlocks):"—");
         changed(toggle,node.active?"Stop node":node.busy?"Stop task":"Start node");toggle.setEnabled(node.active||node.busy?canStop:canStart);
         toggle.setContentDescription(node.active?"Stop the local node":node.busy?"Stop the current node task":(LiteRuntime.ENABLED?"Start the compact local node and continue setup.":"Show Teleno Node Lite preview status. Compact mining is not available yet."));
         WalletReader.Balance b=data.balance;boolean saved=b!=null&&(!data.balanceError.isEmpty()||now-b.at>90000);

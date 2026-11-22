@@ -117,7 +117,7 @@ python3 tools/build-apk.py --sdk /android-sdk --ecj /ecj.jar --bridge /native-bi
 python3 tools/test-ui.py --deps /robolectric-jars --ecj /ecj.jar \
   --test-class LiteRuntimeUiTest --output /test-output
 python3 tools/verify-lite-isolation.py --standard-root /standard-app \
-  --sdk /android-sdk --apk build/Teleno-Node-Lite-0.2.1.apk
+  --sdk /android-sdk --apk build/Teleno-Node-Lite-0.2.2.apk
 ```
 
 The snapshot's exact files and genesis are verified again before bundling. The
@@ -132,7 +132,7 @@ checkpoint. To recover them for a source rebuild, first verify the APK's supplie
 checksum/signature, then run:
 
 ```bash
-python3 tools/extract-lite-runtime.py --apk /Teleno-Node-Lite-0.2.1.apk \
+python3 tools/extract-lite-runtime.py --apk /Teleno-Node-Lite-0.2.2.apk \
   --output /new/extracted-runtime
 ```
 
@@ -153,3 +153,15 @@ markers for `tests/native/check_java_restore.py`. That helper starts an isolated
 ARM64 observer from a copy, checks native preflight, Mainnet state identity, the
 observer recovery hold and a local KOIN contract read. Physical-device operation
 remains separate. See `evidence/lite-0.2.1/VALIDATION.md`.
+
+## Sync status and recovery regression tests added in 0.2.2
+
+`SyncStatusTests` replays sanitized chain/peer timing without a wallet or network.
+It covers startup counts versus newer native gate events, event expiry, malformed
+metrics, measured native progress and the RPC recovery deadline. Existing chain
+identity, timestamp, advancement and finality requirements remain enforced.
+`SyncStatusUiTest` verifies the enabled-runtime dashboard for current-chain peer
+loss, pending peer counts, real eligibility activity, RPC delays and historical
+sync. Run it with `tools/test-ui.py --test-class SyncStatusUiTest` using the same
+dependency and compiler arguments above. These fixture tests do not establish
+phone endurance, live peer stability or Mainnet PoB production.

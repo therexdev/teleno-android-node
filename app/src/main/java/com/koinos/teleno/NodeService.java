@@ -24,12 +24,13 @@ public final class NodeService extends Service {
     static final String REVIEWED="production-reviewed", REVIEW_ACCOUNT="reviewed-account", REVIEW_KEY="reviewed-public-key";
     private static final String CHANNEL = "teleno-lite-node";
     private static final int NOTICE = 100;
-    private static final Pattern PEERS = Pattern.compile("\\bpeer_count=(\\d+)");
     private static final Object LOCK = new Object();
     private static volatile NodeService instance;
     static final class ViewState {
         String phase = LiteRuntime.ENABLED?"Stopped":"Lite preview", detail = LitePreview.EXPLANATION, mode = "stopped", network = "mainnet";
         long height, lib, freeBytes, headTime, sampleAt, localBlocks, runStartedAt, runEndedAt; boolean producerRunning; int peers = -1;
+        long peerSampleAt,nativeProgressAt;boolean peerCountPending;
+        Readiness.State readinessState=Readiness.State.VERIFYING;
         ProductionStatus.Snapshot production = new ProductionStatus().snapshot();
         String producerAccount="",runNetwork="",runAccount="";
         boolean active, busy, ready, hasSample, downloading; int downloadPercent=-1;
@@ -40,6 +41,7 @@ public final class NodeService extends Service {
             x.runStartedAt=runStartedAt;x.runEndedAt=runEndedAt;
             x.runNetwork=runNetwork;x.runAccount=runAccount;
             x.producerAccount=producerAccount;x.production=production;x.sampleAt=sampleAt;x.localBlocks=localBlocks;x.producerRunning=producerRunning; x.height = height; x.lib = lib; x.freeBytes = freeBytes; x.headTime = headTime; x.peers = peers;
+            x.peerSampleAt=peerSampleAt;x.peerCountPending=peerCountPending;x.nativeProgressAt=nativeProgressAt;x.readinessState=readinessState;
             x.active = active; x.busy = busy; x.ready = ready; x.hasSample = hasSample; x.downloading=downloading;x.downloadPercent=downloadPercent;x.readiness = readiness; x.productionProblem = productionProblem; x.productionProblemNetwork = productionProblemNetwork; x.events = new ArrayList<>(events); return x;
         }
     }
@@ -416,7 +418,7 @@ public final class NodeService extends Service {
             synchronized (LOCK) { if(resumeReview==null){VIEW.runStartedAt=0;VIEW.runEndedAt=0;VIEW.runNetwork=network;VIEW.runAccount="";}
                 else {SharedPreferences prefs=getSharedPreferences("settings",MODE_PRIVATE);long runAt=prefs.getLong("production-run-at",0);
                     if(producer&&runAt==0){runAt=startedAt;prefs.edit().putLong("production-run-at",runAt).apply();}
-                    VIEW.runStartedAt=runAt;VIEW.runEndedAt=0;VIEW.runNetwork=network;VIEW.runAccount=resumeReview.account;}VIEW.producerAccount=producer?account:"";VIEW.production=productionStatus.snapshot();VIEW.localBlocks=0;VIEW.producerRunning=false;VIEW.active = true; VIEW.mode = mode; VIEW.network = network; VIEW.ready = false; VIEW.hasSample = false; VIEW.peers = -1; VIEW.height = VIEW.lib = VIEW.headTime = 0; }
+                    VIEW.runStartedAt=runAt;VIEW.runEndedAt=0;VIEW.runNetwork=network;VIEW.runAccount=resumeReview.account;}VIEW.producerAccount=producer?account:"";VIEW.production=productionStatus.snapshot();VIEW.localBlocks=0;VIEW.producerRunning=false;VIEW.active = true; VIEW.mode = mode; VIEW.network = network; VIEW.ready = false; VIEW.hasSample = false; VIEW.peers = -1; VIEW.height = VIEW.lib = VIEW.headTime = 0;VIEW.peerSampleAt=VIEW.nativeProgressAt=0;VIEW.peerCountPending=false;VIEW.readinessState=Readiness.State.VERIFYING; }
             holdLocks();
             healthySince=0;recovery.processStarted();
             try (OutputStream input = child.getOutputStream()) { if (signingLine != null) input.write(signingLine); }
@@ -479,8 +481,11 @@ public final class NodeService extends Service {
         } catch (IOException ignored) { /* Process exit is reported by poll, not inferred from a closed stream. */ }
     }
     private void parseLine(String line) {
-        Matcher peers = PEERS.matcher(line);
-        if (peers.find()) try { synchronized (readiness) { readiness.peers = Integer.parseInt(peers.group(1)); readiness.peersAt = System.currentTimeMillis(); } } catch (NumberFormatException ignored) { }
+        long now=System.currentTimeMillis();
+        synchronized(readiness){
+            readiness.acceptNative(line,now,SystemClock.elapsedRealtime());
+            synchronized(LOCK){VIEW.peers=readiness.peers;VIEW.peerSampleAt=readiness.peersAt;VIEW.peerCountPending=readiness.peerCountPending(now);VIEW.nativeProgressAt=readiness.nativeProgressAt;}
+        }
         if (line.contains("TELENO_ANDROID_NODE_ALREADY_RUNNING")) status("Another node owns the database", "Wait for the previous node to finish shutting down, then retry.");
         if (PRODUCER.equals(mode)) {
             if(productionStatus.accept(line,SystemClock.elapsedRealtime())) { event("Produced a local block at height " + productionStatus.lastHeight() + ". Network finality is separate."); HistoryStore.record(this,network,"Local block produced","Height "+productionStatus.lastHeight()+" · network finality and rewards are checked separately."); }
@@ -502,28 +507,31 @@ public final class NodeService extends Service {
             try {requireEnvironment(PRODUCER.equals(mode));}
             catch(Disconnected e) {
                 // Connectivity loss alone should not tear down a healthy native process.
-                synchronized(LOCK){VIEW.ready=false;VIEW.readiness="Waiting for the approved network connection to return.";}
+                synchronized(LOCK){VIEW.ready=false;VIEW.readinessState=Readiness.State.NETWORK;VIEW.readiness="Waiting for the approved network connection to return.";}
                 status("Reconnecting network","The node remains open and will reconnect automatically. Stop node cancels the run.");return;
             }
             LocalRpc rpc=new LocalRpc();boolean matches;JSONObject head;
             try {matches=rpc.chainMatches(network);head=rpc.call("chain.get_head_info",new JSONObject());}
             catch(Exception e) {
                 readFailures++;healthySince=0;
-                synchronized(LOCK){VIEW.ready=false;VIEW.readiness="Waiting for the local node response; automatic recovery is enabled.";}
-                if(recovery.rpcExpired(elapsed))throw new Pause("Local RPC has been unavailable for 3 minutes. Restarting through the observer.");
+                synchronized(LOCK){VIEW.ready=false;VIEW.readinessState=Readiness.State.LOCAL_RESPONSE;VIEW.readiness="Waiting for the local node response; automatic recovery is enabled.";}
+                long nativeAt;synchronized(readiness){nativeAt=readiness.nativeProgressAt;}
+                if(recovery.rpcExpired(elapsed,nativeAt))throw new Pause("Local RPC is unavailable and native progress has not recovered for 3 minutes. Restarting through the observer.");
                 status("Waiting for node response","The process is running. Retrying local checks before restarting; no wallet transaction is submitted.");return;
             }
             readFailures=0;recovery.rpcHealthy();
             if(!matches)throw new ContextChanged("The node reported a different chain. Automatic recovery was cancelled; data was preserved.");
-            String blocker;
+            String blocker;Readiness.State issue;boolean chainCurrent;
             synchronized(readiness) {
                 readiness.sample(head.getJSONObject("head_topology").getLong("height"),head.getLong("last_irreversible_block"),head.getLong("head_block_time"),now,true);
                 if(readiness.advancedAt==now&&readiness.irreversible>0&&readiness.irreversible<=readiness.height)NodeStorage.validated(this,network);
                 blocker=readiness.blocker(now);
+                issue=readiness.state(now);chainCurrent=readiness.chainState(now)==Readiness.State.READY;
                 synchronized(LOCK){VIEW.height=readiness.height;VIEW.lib=readiness.irreversible;VIEW.headTime=readiness.headTime;VIEW.peers=readiness.peers;
+                    VIEW.readinessState=issue;VIEW.peerSampleAt=readiness.peersAt;VIEW.peerCountPending=readiness.peerCountPending(now);VIEW.nativeProgressAt=readiness.nativeProgressAt;
                     VIEW.production=productionStatus.snapshot();VIEW.sampleAt=now;VIEW.localBlocks=productionStatus.blocks();VIEW.producerRunning=PRODUCER.equals(mode)&&productionStatus.running();VIEW.hasSample=true;VIEW.ready=blocker==null;VIEW.readiness=blocker==null?"Local chain is advancing. Automatic recovery is enabled; Stop node ends this run.":blocker;}
             }
-            if(recovery.stalled(elapsed,blocker==null)&&PRODUCER.equals(mode))throw new Pause("Production chain checks have not recovered for 5 minutes. Resyncing through the observer.");
+            if(recovery.stalled(elapsed,chainCurrent)&&PRODUCER.equals(mode))throw new Pause("Production chain checks have not recovered for 5 minutes. Resyncing through the observer.");
             if(blocker==null){if(healthySince==0)healthySince=elapsed;if(elapsed-healthySince>=300000)recovery.healthy();}else healthySince=0;
             if(OBSERVER.equals(mode)&&wanted&&resumeReview!=null&&blocker==null&&!snapshot().busy&&elapsed>=retryAt) {
                 synchronized(LOCK){VIEW.busy=true;}
@@ -546,7 +554,7 @@ public final class NodeService extends Service {
                 status(health.title(elapsed),health.explanation(elapsed)+"\n"+health.brief(elapsed)+"\nAutomatic recovery is enabled. Stop node ends the run.");
             }else {
                 if(recovery.observerExpired(elapsed,head.getJSONObject("head_topology").getLong("height")))throw new Pause("The observer has not advanced for 10 minutes. Reconnecting through a clean restart.");
-                status(blocker==null?"Observer is up to date":"Observer is syncing",blocker==null?"New blocks are being validated on this device.":blocker);
+                status(blocker==null?"Observer is up to date":issue.title,blocker==null?"New blocks are being validated on this device.":blocker);
             }
         }catch(Exception e) {
             if(e instanceof ContextChanged)forgetRun();

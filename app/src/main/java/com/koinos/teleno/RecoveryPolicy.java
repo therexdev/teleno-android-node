@@ -6,6 +6,10 @@ final class RecoveryPolicy {
     private int attempts;
     private long producerSince=-1,lastEvaluations=-1,observerSince=-1,lastHeight=-1;
     synchronized boolean rpcExpired(long now) { if(rpcSince<0)rpcSince=now;return now-rpcSince>=180000; }
+    synchronized boolean rpcExpired(long now,long nativeProgressAt) {
+        if(nativeProgressAt>0&&now>=nativeProgressAt&&now-nativeProgressAt<=90000&&nativeProgressAt>rpcSince){rpcSince=now;return false;}
+        return rpcExpired(now);
+    }
     synchronized void rpcHealthy() { rpcSince=-1; }
     synchronized boolean stalled(long now,boolean ready) {
         if(ready){stalledSince=-1;return false;}

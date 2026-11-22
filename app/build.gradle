@@ -6,8 +6,8 @@ android {
         applicationId 'com.koinos.teleno.lite'
         minSdk 28
         targetSdk 36
-        versionCode 3
-        versionName '0.2.1'
+        versionCode 4
+        versionName '0.2.2'
         ndk { abiFilters 'arm64-v8a' }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }

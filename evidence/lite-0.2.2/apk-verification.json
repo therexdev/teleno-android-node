@@ -1,0 +1,20 @@
+{
+  "apk": "Teleno-Node-Lite-0.2.2.apk",
+  "bytes": 71310648,
+  "sha256": "5e6c761b50b253b0f7d980906fd5162889cdb238c31837d9f7e11e729f8e95aa",
+  "package_badging": "package: name='com.koinos.teleno.lite' versionCode='4' versionName='0.2.2' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'",
+  "signer_certificate_sha256": "05db99a3f860721985cf7999e3503c6f652b3104a4e86750bcdb0553a00e71e1",
+  "library_alignment_16_kib": true,
+  "native_sha256": {
+    "lib/arm64-v8a/libteleno_keys.so": "6830127dd2652b848d002a388a63f2fd817578ae97c34a6ac236310bf7bbee62",
+    "lib/arm64-v8a/libteleno_runner.so": "937e943f1c6ac17192ed483ad64f4fff5ea7bb134c179b9d172ee03b38785327",
+    "lib/arm64-v8a/libteleno_node.so": "36dae70b7fa3bbba95140010341d0d92424666c0c0fad9d40746525a548bbbd6"
+  },
+  "snapshot_manifest_sha256": "0d85642265851c5236bee55c8bad2f4d27df32fbaab66b1ccf56e3fc428cc2ac",
+  "native_and_snapshot_byte_identical_to_0_2_1": true,
+  "unchanged_entries_compared": 41,
+  "experimental_production_enabled": true,
+  "production_qualified": false,
+  "physical_device_tested": false,
+  "mainnet_pob_production_tested": false
+}

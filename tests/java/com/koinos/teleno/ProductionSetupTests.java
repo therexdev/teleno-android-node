@@ -47,7 +47,7 @@ public final class ProductionSetupTests {
         r.headTime = now + 31000; check(r.blocker(now).contains("automatic date and time"), "Clock mismatch has an actionable explanation");
         r.headTime = 0; check(r.blocker(now).contains("timestamp"), "Unknown timestamp is not called syncing progress");
         r.headTime = now; r.peers = -1; check(r.blocker(now).contains("first peer report"), "Missing metrics are distinct from disconnected peers");
-        r.peers = 0; check(r.blocker(now).contains("No peers are connected"), "Zero peers show connection guidance");
+        r.peers = 0; check(r.state(now)==Readiness.State.NO_PEERS&&r.blocker(now).contains("Reconnecting peers"), "Zero peers on a current chain show connection guidance");
         r.peers = 2; r.peersAt = now - 91000; check(r.blocker(now).contains("stale"), "Old peer data remains blocked");
         r.peersAt = now; r.correctChain = false; check(r.blocker(now) != null, "Wrong chain remains blocked");
         System.out.println("PASS: " + assertions + " production setup and actionable-readiness assertions. Android UI testing is separate.");

@@ -90,7 +90,9 @@ final class NodeShell {
             +"\nProducer account used at launch: "+(node.producerAccount.isEmpty()?"no producer launched":node.producerAccount)
             +"\nSelected wallet: "+(data==null||data.account.isEmpty()?"not selected":data.account)
             +"\nLocal block: "+node.height+"\nIrreversible: "+node.lib+"\nLocal block age: "+age
-            +"\nPeers: "+(node.peers<0?"not reported":node.peers)+"\nLocal blocks this run: "+node.localBlocks
+            +"\nPeers: "+(node.peerCountPending?"connected; exact count pending":node.peers<0?"not reported":node.peers)
+            +"\nLast numeric peer count: "+(node.peers<0?"not reported":node.peers)+(node.peerSampleAt>0?" · "+Math.max(0,(now-node.peerSampleAt)/1000)+"s ago":"")
+            +"\nReadiness state: "+node.readinessState.name()+"\nLocal blocks this run: "+node.localBlocks
             +"\nChain readiness: "+node.readiness+"\n"+NodeStorage.report(activity,node.network)
             +"\nAutomatic recovery requested: "+NodeService.resumeRequested(activity)
             +"\nBattery optimization exempt: "+activity.getSystemService(android.os.PowerManager.class).isIgnoringBatteryOptimizations(activity.getPackageName())

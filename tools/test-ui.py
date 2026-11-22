@@ -16,7 +16,7 @@ parser.add_argument('--deps', type=Path, required=True)
 parser.add_argument('--ecj', type=Path, required=True)
 parser.add_argument('--classes', type=Path, default=root / 'build/apk/classes')
 parser.add_argument('--output', type=Path, default=root / 'evidence/ui')
-parser.add_argument('--test-class',default='LiteUiTest',choices=['LiteUiTest','LiteRuntimeUiTest','LiteRestoreTest'])
+parser.add_argument('--test-class',default='LiteUiTest',choices=['LiteUiTest','LiteRuntimeUiTest','LiteRestoreTest','SyncStatusUiTest'])
 args = parser.parse_args()
 deps = args.deps.resolve()
 build = root / 'build/ui-tests'

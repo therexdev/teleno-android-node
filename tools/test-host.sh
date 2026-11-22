@@ -53,6 +53,8 @@ java -jar "$TELENO_ECJ" -17 -nowarn -cp "$TELENO_JSON_JAR" -d "$TEST_DIR/classes
   "$ROOT/tests/java/com/koinos/teleno/StartupPortsTests.java" \
   "$ROOT/tests/java/com/koinos/teleno/BurnRecoveryTests.java" \
   "$ROOT/tests/java/com/koinos/teleno/DataStorageTests.java"
+java -jar "$TELENO_ECJ" -17 -nowarn -cp "$TEST_DIR/classes:$TELENO_JSON_JAR" -d "$TEST_DIR/classes" "$ROOT/tests/java/com/koinos/teleno/SyncStatusTests.java"
+java -cp "$TEST_DIR/classes" com.koinos.teleno.SyncStatusTests
 java -Djava.library.path="$TEST_DIR" -cp "$TEST_DIR/classes" com.koinos.teleno.CoreTests
 java -Djava.library.path="$TEST_DIR" -cp "$TEST_DIR/classes" com.koinos.teleno.StorageTests "$TEST_DIR/teleno_runner"
 java -cp "$TEST_DIR/classes:$TELENO_JSON_JAR" com.koinos.teleno.VaultTests

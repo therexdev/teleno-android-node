@@ -34,6 +34,12 @@ final class ProductionStatus {
     synchronized long blocks(){return blocks;}
     synchronized long lastHeight(){return lastHeight;}
     synchronized Snapshot snapshot(){return new Snapshot(this);}
+    static String infoBody(String line) {
+        if(line==null||line.length()>8192)return null;
+        String plain=COLOR.matcher(line).replaceAll("");Matcher header=HEADER.matcher(plain);
+        if(header.matches())return "info".equals(header.group(1))?header.group(2):null;
+        return plain.startsWith("INFO ")?plain.substring(5):null;
+    }
     synchronized boolean accept(String line){return accept(line,System.nanoTime()/1000000L);}
     synchronized boolean accept(String line,long now) {
         if(line==null||line.length()>8192)return false;
