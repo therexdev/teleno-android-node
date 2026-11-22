@@ -104,11 +104,11 @@ public class UiSmokeTest {
     org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);
     MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
     java.lang.reflect.Field field=MainActivity.class.getDeclaredField("shell");field.setAccessible(true);shell=(NodeShell)field.get(a);shell.foreground(false);shell.select(1,false);
-    render("setup-portrait",824,1830);assertNotNull(shell.setup.findViewWithTag("setup-4"));assertNotNull(shell.setup.findViewWithTag("setup-5"));assertNotNull("Health report stays available in Setup",shell.setup.findViewWithTag("production-health"));
+    render("setup-portrait",824,1830);assertNotNull(shell.setup.findViewWithTag("setup-4"));assertNull("Setup has exactly four numbered steps",shell.setup.findViewWithTag("setup-5"));assertNotNull("Health report stays available in Setup",shell.setup.findViewWithTag("production-health"));
     View permission=shell.setup.findViewWithTag("review-vhp-permission");assertNotNull(permission);assertTrue(permission.isEnabled());permission.performClick();
     AlertDialog prerequisite=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertTrue(prerequisite.isShowing());
-    assertTrue(hasText(prerequisite.getWindow().getDecorView(),"Mainnet"));prerequisite.dismiss();
-    shell.setup.scrollTo(0,shell.setup.findViewWithTag("setup-5").getTop());render("setup-vhp-permission",824,1830);
+    assertTrue(hasText(prerequisite.getWindow().getDecorView(),"step 1"));prerequisite.dismiss();
+    shell.setup.scrollTo(0,shell.setup.findViewWithTag("setup-2").getTop());render("setup-vhp-permission",824,1830);
     shell.navItems.get(2).performClick();assertEquals(2,shell.tab);shell.navItems.get(0).performClick();assertEquals(0,shell.tab);
     shell.navItems.get(2).performClick();
     android.content.res.Configuration landscape=new android.content.res.Configuration(a.getResources().getConfiguration());
@@ -404,7 +404,7 @@ public class UiSmokeTest {
     a.getSharedPreferences("settings",0).edit().clear().putString("network","mainnet").commit();File folder=savedChain(a,"mainnet","d".repeat(32));
     a.getSharedPreferences("storage",0).edit().putString("mainnet-volume","phone").putString("mainnet-generation","d".repeat(32)).commit();
     controller.create().start().resume().visible();assertTrue(NodeStorage.hasChain(a,"mainnet"));TextView next=(TextView)getPrivate(a,"next");
-    assertTrue(next.getText().toString().contains("No new snapshot or backup cleanup"));assertTrue(new File(folder,"db/CURRENT").exists());controller.pause().stop().destroy();
+    assertTrue(next.getText().toString().contains("no new snapshot is required"));assertTrue(new File(folder,"db/CURRENT").exists());controller.pause().stop().destroy();
   }
   @Test public void backupDeletionIsClearlyOptional()throws Exception {
     org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
@@ -507,4 +507,82 @@ public class UiSmokeTest {
       catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("2 GiB"));}
     }finally{controller.destroy();}
   }
+  @Test public void fourStepSetupAndDashboardStartShareOnboarding()throws Exception {
+    RuntimeEnvironment.setQualifiers("w412dp-h915dp-port-xhdpi");
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);
+    MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    try {
+      NodeShell actual=(NodeShell)getPrivate(a,"shell");LinearLayout list=(LinearLayout)getPrivate(a,"content");int previous=-1;
+      String[] titles={"1  ·  Connect wallet","2  ·  Burn KOIN to VHP","3  ·  Restore or download chain","4  ·  Start node"};
+      for(int i=1;i<=4;i++){View step=list.findViewWithTag("setup-"+i);assertNotNull(step);assertTrue(list.indexOfChild(step)>previous);previous=list.indexOfChild(step);assertTrue(hasText(step,titles[i-1]));}
+      assertNull(list.findViewWithTag("setup-5"));
+      Button home=(Button)actual.root.findViewWithTag("home-toggle");assertEquals("Start node",home.getText().toString());assertTrue(home.isEnabled());home.performClick();
+      assertEquals("Home Start node opens the same missing-wallet step",1,actual.tab);
+      AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertTrue(hasText(dialog.getWindow().getDecorView(),"Connect your wallet in step 1"));dialog.dismiss();
+      ((Button)getPrivate(a,"production")).performClick();assertTrue(hasText(org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().getWindow().getDecorView(),"Connect your wallet in step 1"));
+    }finally{controller.pause().stop().destroy();}
+  }
+  @Test public void burnContextWorksBeforeDownloadAndWhileSameProducerRuns()throws Exception {
+    RuntimeEnvironment.setQualifiers("w412dp-h915dp-port-xhdpi");
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);
+    MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    java.lang.reflect.Field field=NodeService.class.getDeclaredField("VIEW");field.setAccessible(true);NodeService.ViewState node=(NodeService.ViewState)field.get(null);
+    String account="1111111111111111111114oLvT2";a.getSharedPreferences("settings",0).edit().putString("network","mainnet").putString("producer-mainnet",account).commit();
+    try {
+      node.active=false;node.busy=false;node.mode="stopped";assertEquals(account,invokePrivate(a,"permissionAccount",new Class<?>[]{boolean.class},false));
+      node.active=true;node.mode=NodeService.PRODUCER;node.network="mainnet";node.producerAccount=account;
+      assertEquals(account,invokePrivate(a,"permissionAccount",new Class<?>[]{boolean.class},false));
+      invokePrivate(a,"refresh",new Class<?>[]{});assertTrue("Reconnect is available during production",((Button)getPrivate(a,"connectWallet")).isEnabled());
+      assertFalse("Key registration still cannot replace an active producer",((Button)getPrivate(a,"registerWallet")).isEnabled());
+      try{invokePrivate(a,"permissionAccount",new Class<?>[]{boolean.class},true);fail("Revoke requires stopping production");}catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("revoking"));}
+      ProductionPermission.Snapshot permission=new ProductionPermission.Snapshot(account,new java.math.BigInteger("300000000"),new java.math.BigInteger("200000000"),System.currentTimeMillis());
+      a.showBurnReview(new BurnKoin.Snapshot(permission,"19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",new java.math.BigInteger("1000000000"),new java.math.BigInteger("500000000")),new java.math.BigInteger("123456789"),true);
+      AlertDialog review=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertTrue(hasText(review.getWindow().getDecorView(),"Your node keeps running"));review.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();
+      assertTrue(node.active);assertEquals(NodeService.PRODUCER,node.mode);
+      node.producerAccount=ProductionPermission.POB;
+      try{invokePrivate(a,"permissionAccount",new Class<?>[]{boolean.class},false);fail("another producer cannot use this wallet");}catch(java.lang.reflect.InvocationTargetException expected){assertTrue(expected.getCause().getMessage().contains("another network or producer"));}
+    }finally{node.active=false;node.mode="stopped";node.producerAccount="";controller.pause().stop().destroy();}
+  }
+  @Test public void dashboardStartupIntentRequestsProducerAndKeepsMobileConsent()throws Exception {
+    RuntimeEnvironment.setQualifiers("w412dp-h915dp-port-xhdpi");
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);
+    MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    try {
+      Shadows.shadowOf((android.app.Application)a.getApplication()).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+      String account="1111111111111111111114oLvT2";byte[] pub=new byte[33];pub[0]=2;
+      a.getSharedPreferences("settings",0).edit().putString("producer-mainnet",account).commit();
+      android.net.ConnectivityManager cm=a.getSystemService(android.net.ConnectivityManager.class);
+      org.robolectric.shadows.ShadowConnectivityManager connectivity=Shadows.shadowOf(cm);
+      android.net.Network network=org.robolectric.shadows.ShadowNetwork.newInstance(777);
+      android.net.NetworkCapabilities caps=org.robolectric.shadows.ShadowNetworkCapabilities.newInstance();Shadows.shadowOf(caps).addTransportType(android.net.NetworkCapabilities.TRANSPORT_CELLULAR);Shadows.shadowOf(caps).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+      connectivity.setActiveNetworkInfo(org.robolectric.shadows.ShadowNetworkInfo.newInstance(android.net.NetworkInfo.DetailedState.CONNECTED,android.net.ConnectivityManager.TYPE_MOBILE,0,true,true));
+      android.net.Network active=cm.getActiveNetwork();connectivity.setNetworkCapabilities(active,caps);
+      invokePrivate(a,"submitNodeStart",new Class<?>[]{String.class,String.class,byte[].class},"mainnet",account,pub);
+      AlertDialog review=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertTrue(hasText(review.getWindow().getDecorView(),"carrier data limits"));
+      review.getButton(DialogInterface.BUTTON_NEGATIVE).performClick();assertNull(Shadows.shadowOf((android.app.Application)a.getApplication()).getNextStartedService());
+      assertEquals("mainnet",getPrivate(a,"network"));assertFalse(NodeService.isActive());assertEquals(account,a.getSharedPreferences("settings",0).getString("producer-mainnet",""));
+      invokePrivate(a,"submitNodeStart",new Class<?>[]{String.class,String.class,byte[].class},"mainnet",account,pub);
+      review=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();review.getButton(DialogInterface.BUTTON_POSITIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();
+      Intent sent=Shadows.shadowOf((android.app.Application)a.getApplication()).getNextStartedService();assertNotNull(sent);assertEquals(NodeService.PRODUCER,sent.getAction());assertTrue(sent.getBooleanExtra(NodeService.REVIEWED,false));assertTrue(sent.getBooleanExtra("allow_mobile_run",false));assertEquals(account,sent.getStringExtra(NodeService.REVIEW_ACCOUNT));assertArrayEquals(pub,sent.getByteArrayExtra(NodeService.REVIEW_KEY));
+    }finally{controller.pause().stop().destroy();}
+  }
+
+  @Test public void notificationGrantContinuesTheReviewedStart()throws Exception {
+    RuntimeEnvironment.setQualifiers("w412dp-h915dp-port-xhdpi");
+    org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);
+    MainActivity a=controller.get();a.setTheme(android.R.style.Theme_Material_NoActionBar);controller.create().start().resume().visible();
+    try {
+      android.app.Application app=(android.app.Application)a.getApplication();Shadows.shadowOf(app).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+      String account="1111111111111111111114oLvT2";byte[] pub=new byte[33];pub[0]=2;
+      a.getSharedPreferences("settings",0).edit().putString("producer-mainnet",account).commit();
+      android.net.ConnectivityManager cm=a.getSystemService(android.net.ConnectivityManager.class);android.net.NetworkCapabilities caps=org.robolectric.shadows.ShadowNetworkCapabilities.newInstance();
+      Shadows.shadowOf(caps).addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI);Shadows.shadowOf(caps).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);Shadows.shadowOf(caps).addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+      Shadows.shadowOf(cm).setNetworkCapabilities(cm.getActiveNetwork(),caps);
+      invokePrivate(a,"submitNodeStart",new Class<?>[]{String.class,String.class,byte[].class},"mainnet",account,pub);assertNotNull(getPrivate(a,"notificationStart"));assertNull(Shadows.shadowOf(app).getNextStartedService());
+      Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+      a.onRequestPermissionsResult(10,new String[]{android.Manifest.permission.POST_NOTIFICATIONS},new int[]{android.content.pm.PackageManager.PERMISSION_GRANTED});
+      Intent intent=Shadows.shadowOf(app).getNextStartedService();assertNotNull("Grant finishes the same start without another tap",intent);assertEquals(NodeService.PRODUCER,intent.getAction());assertNull(getPrivate(a,"notificationStart"));
+    }finally{controller.pause().stop().destroy();}
+  }
+
 }

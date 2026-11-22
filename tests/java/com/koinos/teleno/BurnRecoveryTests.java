@@ -16,7 +16,7 @@ public final class BurnRecoveryTests {
         return new BurnKoin.Snapshot(new ProductionPermission.Snapshot(ACCOUNT,new BigInteger("300000000"),new BigInteger("200000000"),at),"19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK",new BigInteger("1000000000"),new BigInteger("500000000"));
     }
     static final class Rpc implements WalletReader.Rpc {
-        JSONArray history=new JSONArray();boolean wrong,zero;int irreversibleReads;
+        JSONArray history=new JSONArray();boolean wrong,zero,moving;int irreversibleReads,vhpReads;
         public JSONObject call(String method,JSONObject params)throws Exception {
             if(method.equals("chain.get_chain_id"))return new JSONObject().put("chain_id",wrong?"AQ==":ProductionPermission.CHAIN);
             if(method.equals("chain.invoke_system_call")) {
@@ -28,7 +28,7 @@ public final class BurnRecoveryTests {
             if(method.equals("chain.read_contract")) {
                 boolean koin=params.getString("contract_id").equals(snapshot(0).koinContract),allowance=params.getLong("entry_point")==ProductionPermission.ALLOWANCE;
                 if(zero||(koin&&allowance))return new JSONObject();
-                long value=koin?1000000000L:allowance?200000000L:300000000L;
+                long value=koin?1000000000L:allowance?200000000L:(moving&&vhpReads++>0?299999999L:300000000L);
                 java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();out.write(8);
                 do{out.write((int)(value&127)|(value>127?128:0));value>>>=7;}while(value!=0);
                 return new JSONObject().put("result",WalletReader.b64(out.toByteArray()));
@@ -66,12 +66,21 @@ public final class BurnRecoveryTests {
         rejects(()->BurnKoin.requireCurrent(s,s,new BigInteger("400000001"),true,1000001),"insufficient mana");
         BurnKoin.Snapshot changed=new BurnKoin.Snapshot(s.permission,s.koinContract,BigInteger.ONE,s.mana);
         rejects(()->BurnKoin.requireCurrent(s,changed,AMOUNT,true,1000001),"wallet balance changed after review");
+        BurnKoin.Snapshot mined=new BurnKoin.Snapshot(new ProductionPermission.Snapshot(ACCOUNT,BigInteger.ONE,BigInteger.ZERO,1000001),s.koinContract,s.koin.add(BigInteger.ONE),s.mana);
+        BurnKoin.requireCurrent(s,mined,AMOUNT,true,1000001);count++;
+        BurnKoin.Snapshot spent=new BurnKoin.Snapshot(mined.permission,s.koinContract,s.koin,BigInteger.ONE);
+        rejects(()->BurnKoin.requireCurrent(s,spent,AMOUNT,true,1000001),"mining movement never bypasses current mana limit");
+        BurnKoin.Snapshot other=new BurnKoin.Snapshot(new ProductionPermission.Snapshot(ProductionPermission.POB,s.permission.balance,s.permission.allowance,1000001),s.koinContract,s.koin,s.mana);
+        rejects(()->BurnKoin.requireCurrent(s,other,AMOUNT,true,1000001),"changed producer cannot burn");
+        BurnKoin.Snapshot token=new BurnKoin.Snapshot(s.permission,ProductionPermission.VHP,s.koin,s.mana);
+        rejects(()->BurnKoin.requireCurrent(s,token,AMOUNT,true,1000001),"changed KOIN contract cannot burn");
+        rejects(()->BurnKoin.requireCurrent(s,s,AMOUNT,true,999999),"clock reversal invalidates burn review");
         JSONArray ops=BurnKoin.operations(s,AMOUNT,true);
         check(ops.length()==3,"one atomic request includes KOIN approve, PoB burn, VHP approve");
         check(ops.getJSONObject(0).getJSONObject("call_contract").getString("contract_id").equals(s.koinContract),"first approval targets only KOIN");
         check(ops.getJSONObject(1).getJSONObject("call_contract").getString("contract_id").equals(ProductionPermission.POB),"burn only through official PoB");
         check(ops.getJSONObject(1).getJSONObject("call_contract").getLong("entry_point")==BurnKoin.BURN,"PoB burn entry point");
-        check(ops.getJSONObject(2).getJSONObject("call_contract").getString("args").equals(WalletReader.b64(ProductionPermission.approveArgs(ACCOUNT,new BigInteger("423456789")))),"new production allowance is existing VHP plus exact burn");
+        check(ops.getJSONObject(2).getJSONObject("call_contract").getString("args").equals(WalletReader.b64(ProductionPermission.approveArgs(ACCOUNT,new BigInteger("423456789")))),"new production allowance stays at reviewed VHP plus exact burn despite mining");
         check(BurnKoin.operations(s,AMOUNT,false).length()==2,"VHP approval can be declined");
         byte[] wire=BurnKoin.burnArgs(ACCOUNT,AMOUNT);Proto.Reader reader=new Proto.Reader(wire);
         check(reader.varint()==8&&reader.varint()==123456789L,"burn protobuf exact amount");
@@ -81,6 +90,7 @@ public final class BurnRecoveryTests {
         check(review.contains("1.23456789 KOIN")&&review.contains("4.23456789 VHP")&&review.contains("irreversible")&&review.contains(ACCOUNT),"review includes exact burn, resulting allowance and owner");
         Rpc rpc=new Rpc();BurnKoin.Snapshot loaded=BurnKoin.read(rpc,ACCOUNT,1000000);
         check(loaded.koin.equals(s.koin)&&loaded.permission.balance.equals(s.permission.balance)&&loaded.maximum().equals(s.maximum()),"burn review loads verified balances, mana and current allowances");
+        rpc.moving=true;check(BurnKoin.read(rpc,ACCOUNT,1000000).permission.balance.equals(new BigInteger("299999999")),"VHP consumption between balance reads does not require stopping mining");rpc.moving=false;
         rpc.zero=true;check(BurnKoin.read(rpc,ACCOUNT,1000000).maximum().signum()==0,"omitted protobuf zero balances remain zero");rpc.zero=false;
         rpc.wrong=true;rejects(()->BurnKoin.read(rpc,ACCOUNT,1000000),"burn cannot use another chain");rpc.wrong=false;
         String txid="0x1220"+"d".repeat(64);

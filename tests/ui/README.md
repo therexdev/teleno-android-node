@@ -79,3 +79,11 @@ Version 0.3.11 adds checks that observer and producer environment validation acc
 battery operation, absent battery broadcasts and unplugging, while continuing to
 reject severe heat and insufficient storage. These are Android simulations,
 not a physical-device battery endurance test.
+
+Version 0.3.12 adds four-step setup order, shared Home/Setup onboarding, burn
+context before chain restore and during production, same-account reconnect controls,
+revocation/account-change guards, fixed burn review while mining, reviewed producer
+startup intents, mobile-data cancellation/approval, and continuation after granting
+notification permission. Host fixtures cover exact reviewed allowances despite
+VHP consumption and rewards, current-funds checks and reuse/expiry of encrypted
+Vault connections. No live signing or carrier traffic is used.

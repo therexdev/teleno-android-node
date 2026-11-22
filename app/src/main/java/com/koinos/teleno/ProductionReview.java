@@ -12,9 +12,9 @@ final class ProductionReview {
     }
 
     ProductionReview(boolean reviewed, String network, String account, byte[] publicKey) throws Exception {
-        if (!reviewed) throw new IllegalArgumentException("Review block production in step 5 before starting.");
+        if (!reviewed) throw new IllegalArgumentException("Review block production in step 4 before starting.");
         if (!"mainnet".equals(network) && !"harbinger".equals(network)) throw new IllegalArgumentException("Choose a supported network.");
-        if (account == null) throw new IllegalArgumentException("Choose a producer account in step 3.");
+        if (account == null) throw new IllegalArgumentException("Choose a producer account in step 1.");
         Base58.address(account);
         if (publicKey == null || publicKey.length != 33 || (publicKey[0] != 2 && publicKey[0] != 3))
             throw new IllegalArgumentException("A compressed public signing key is required.");
@@ -23,6 +23,6 @@ final class ProductionReview {
 
     void requireCurrent(String network, String account, byte[] publicKey) {
         if (!this.network.equals(network) || !this.account.equals(account) || publicKey == null || !MessageDigest.isEqual(this.publicKey, publicKey))
-            throw new IllegalStateException("The network, producer account or signing key changed. Review production again in step 5.");
+            throw new IllegalStateException("The network, producer account or signing key changed. Review production again in step 4.");
     }
 }

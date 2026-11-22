@@ -22,8 +22,10 @@ final class BurnKoin {
         if(koin.equals(ProductionPermission.VHP)||koin.equals(ProductionPermission.POB))throw new IllegalStateException("The node returned an invalid KOIN contract.");
         // Verify current Mainnet KCS-4 allowance support before building a burn.
         Proto.valueUint64(ProductionPermission.result(rpc.call("chain.read_contract",new JSONObject().put("contract_id",koin).put("entry_point",ProductionPermission.ALLOWANCE).put("args",WalletReader.b64(ProductionPermission.allowanceArgs(account))))));
-        WalletReader.Balance balances=reader.balances(account,"Local observer");
-        if(!permission.balance.equals(new BigInteger(balances.vhp)))throw new IllegalStateException("VHP changed during the balance check. Check again.");
+        WalletReader.Balance balances=reader.balances(account,"Verified Mainnet node");
+        // Production can consume VHP between these reads. Use the latest balance
+        // for the review; it is an estimate, never an instruction to spend more.
+        permission=new ProductionPermission.Snapshot(account,new BigInteger(balances.vhp),permission.allowance,at);
         reader.verify();return new Snapshot(permission,koin,new BigInteger(balances.koin),new BigInteger(balances.mana));
     }
     static BigInteger amount(String text) {
@@ -36,11 +38,12 @@ final class BurnKoin {
     static void requireCurrent(Snapshot reviewed,Snapshot current,BigInteger amount,boolean approve,long now) {
         ProductionPermission.validate(amount);
         if(amount.signum()==0||!reviewed.permission.account.equals(current.permission.account)||now<reviewed.permission.at||now-reviewed.permission.at>120000
-            ||!reviewed.koinContract.equals(current.koinContract)||!reviewed.koin.equals(current.koin)
-            ||!reviewed.permission.balance.equals(current.permission.balance)||!reviewed.permission.allowance.equals(current.permission.allowance))
-            throw new IllegalStateException("The burn review expired or wallet balances/allowance changed. Review the exact amount again.");
+            ||!reviewed.koinContract.equals(current.koinContract))
+            throw new IllegalStateException("The burn review expired or the wallet/network changed. Review the exact amount again.");
+        if(amount.compareTo(reviewed.maximum())>0)throw new IllegalStateException("The amount exceeds the reviewed available KOIN or mana. Review again.");
         if(amount.compareTo(current.maximum())>0)throw new IllegalStateException("The amount exceeds available KOIN or mana. Maximum now: "+WalletReader.amount(current.maximum().toString())+" KOIN (1 KOIN of mana reserved).");
-        if(approve)allowance(current,amount);
+        // Keep the exact reviewed cap even if mining changes VHP or allowance.
+        if(approve)allowance(reviewed,amount);
     }
     static byte[] burnArgs(String account,BigInteger amount)throws Exception {
         ProductionPermission.validate(amount);if(amount.signum()==0)throw new IllegalArgumentException("Burn amount must be positive.");
@@ -59,8 +62,9 @@ final class BurnKoin {
     static String review(Snapshot s,BigInteger amount,boolean approve) {
         return "Network: Mainnet\nWallet / VHP recipient: "+s.permission.account+"\nKOIN contract: "+s.koinContract+"\nOfficial PoB: "+ProductionPermission.POB
             +"\n\nBurn: "+WalletReader.amount(amount.toString())+" KOIN\nReceive: "+WalletReader.amount(amount.toString())+" VHP at the same address"
-            +"\nVHP balance after burn: "+WalletReader.amount(allowance(s,amount).toString())+" VHP"
+            +"\nEstimated VHP balance after burn: "+WalletReader.amount(allowance(s,amount).toString())+" VHP"
             +(approve?"\n\nReplace PoB VHP production allowance: "+WalletReader.amount(s.permission.allowance.toString())+" → "+WalletReader.amount(allowance(s,amount).toString())+" VHP\nThis permits PoB to consume that exact VHP amount for block production until used or revoked.":"\n\nThe existing VHP production allowance will stay unchanged. Approve the new amount separately in step 5 when needed.")
+            +"\n\nYour node keeps running. Mining can change the balance and remaining allowance while you approve; the burn and new allowance above stay fixed at the exact reviewed amounts."
             +"\n\nBurning KOIN is irreversible. One atomic wallet transaction approves exactly the KOIN burn amount, burns it through PoB"
             +(approve?", then sets the reviewed VHP allowance.":".")+" No wallet private key is imported. Review every operation and approve in KOIN Vault. Requests are saved and never resent automatically.";
     }

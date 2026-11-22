@@ -31,7 +31,7 @@ final class VaultClient {
     private boolean unresolved() { return pending()!=null && !Arrays.asList("rejected","observed","dismissed").contains(pending().optString("status")); }
     private void publish() {
         JSONObject s=session(),p=pending(); boolean live=live(); String address=live?s.optString("address",""):"";
-        String note=p!=null?p.optString("note",""):!live?"Connect KOIN Vault to choose your producer account.":address.isEmpty()?"Approve the connection in KOIN Vault, then return here.":"KOIN Vault connected. Your wallet keys remain in Vault.";
+        String note=p!=null?p.optString("note",""):!live?(s==null?"Connect KOIN Vault to choose your producer account.":"The 30-minute Vault connection expired. Reconnect for a new wallet transaction. Your node can keep running."):address.isEmpty()?"Approve the connection in KOIN Vault, then return here.":"KOIN Vault connected. Your wallet keys remain in Vault.";
         view=new View(live&&address.isEmpty(),live&&!address.isEmpty(),unresolved(),address,note,p==null?"":p.optString("txid",""),p==null?"":p.optString("status",""),kind(),p==null?"":p.optString("amount",""),state.optString("knownAddress",s!=null?s.optString("address",p==null?"":p.optString("account","")):p==null?"":p.optString("account","")));
     }
     private void save() throws Exception { store.save(state); publish(); }
@@ -46,7 +46,7 @@ final class VaultClient {
     }
     static void token(String value,int size) { if(value==null || !value.matches("[A-Za-z0-9_-]{"+size+"}")) throw new IllegalArgumentException("Invalid wallet connection response."); }
     synchronized void connect() throws Exception {
-        if(live()) { publish();return; }
+        if(live()) { refresh();return; }
         if(unresolved()) throw new IllegalStateException("Resolve the saved wallet request before reconnecting. It will not be sent again automatically.");
         JSONObject cfg=transport.call("config",null); JSONObject features=cfg.optJSONObject("features");
         if(cfg.optBoolean("demo",true)||!"mainnet".equals(cfg.optString("network"))||features==null||!features.optBoolean("kaiProducer")) throw new IllegalStateException("KOIN Vault producer connections are currently available on live Mainnet only.");

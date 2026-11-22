@@ -27,8 +27,8 @@ final class SnapshotSetup {
         if (!s.arm64) return new SnapshotSetup(Action.EXPLAIN, "Check device compatibility…",
             "This build requires a 64-bit ARM Android installation.");
         if(!s.saved&&!s.replace&&s.existing)return new SnapshotSetup(Action.USE_EXISTING,
-            s.active?"Existing chain is in use":"Use existing chain · start observer",
-            "Your chain data is already downloaded. Start the observer to catch up; no snapshot download or backup deletion is needed. Backup cleanup in step 1 is optional.");
+            s.active?"Existing chain is in use":"Use existing chain · continue",
+            "Your chain data is already downloaded. Continue to Start node in step 4; it catches up before mining. No snapshot download or backup deletion is needed. Backup cleanup under Advanced is optional.");
         if(!s.saved&&!s.replace&&s.recoverable)return new SnapshotSetup(Action.FIND_EXISTING,"Find existing chain data…",
             "Chain files may still be on this device. Reconnect the existing database before considering another large download. No files will be deleted by the search.");
         if (s.free < 0) return new SnapshotSetup(Action.EXPLAIN, "Check chain storage…",

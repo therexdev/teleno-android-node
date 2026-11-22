@@ -208,7 +208,7 @@ public final class NodeService extends Service {
         }
         long request = epoch.incrementAndGet(); stopRequested = false;shuttingDown=false; stopReason = null;
         String chosen = intent.getStringExtra("network");
-        if(OBSERVER.equals(action))runMobile=intent.getBooleanExtra("allow_mobile_run",false);
+        if(OBSERVER.equals(action)||(PRODUCER.equals(action)&&process==null))runMobile=intent.getBooleanExtra("allow_mobile_run",false);
         commands.execute(() -> {
             try {
                 NodeConfig.checkNetwork(chosen);
@@ -270,7 +270,7 @@ public final class NodeService extends Service {
                         });
                         status("Storage ready", "Chain storage: " + NodeStorage.label(this,chosen) + ". Start the observer, then stop it and remove the previous copy to free space.");
                     }
-                } else if (PRODUCER.equals(action)) startProducer(request, chosen,
+                } else if (PRODUCER.equals(action)) prepareProducer(request, chosen,
                     new ProductionReview(intent.getBooleanExtra(REVIEWED, false), chosen, intent.getStringExtra(REVIEW_ACCOUNT), intent.getByteArrayExtra(REVIEW_KEY)));
                 else { network = chosen;SnapshotBootstrap.finishCompleted(this,chosen);if(SnapshotBootstrap.pending(this,chosen))throw new IOException("Resume or discard the unfinished snapshot download before starting the observer.");requireEnvironment(false); verifyEngine(false); rememberRun(null,request); launch(false, null, request); }
             } catch (Exception | LinkageError e) {
@@ -291,7 +291,7 @@ public final class NodeService extends Service {
         if (!info.optBoolean("available")) throw new IllegalStateException("The node engine is missing. Install the full Teleno Node app to start the node.");
         if (!NodeConfig.COMMIT.equals(info.getString("sourceCommit")) || !"arm64-v8a".equals(info.getString("abi"))) throw new IllegalStateException("The bundled node identity is incorrect.");
         if (producer && !ProductionReview.buildAllowsProduction(info.optBoolean("available"), info.optBoolean("productionQualified"), info.optBoolean("experimentalProductionEnabled")))
-            throw new IllegalStateException("This APK does not enable block production. Install the full Teleno Node app to use step 5.");
+            throw new IllegalStateException("This APK does not enable block production. Install the full Teleno Node app to use step 4.");
         JSONObject artifacts = info.getJSONObject("sha256");
         for (String name : Arrays.asList("libteleno_node.so", "libteleno_runner.so", "libteleno_keys.so")) {
             File f = new File(getApplicationInfo().nativeLibraryDir, name);
@@ -318,6 +318,18 @@ public final class NodeService extends Service {
         if (nc == null || !nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) throw new Disconnected();
         if(NetworkPolicy.costly(nc)&&!allowMobile)throw new Pause("Mobile or metered data needs your approval. Reconnect Wi-Fi, or Stop node and Start observer to review mobile data use.");
     }
+    private void prepareProducer(long request,String chosen,ProductionReview review)throws Exception {
+        if(process!=null&&(!OBSERVER.equals(mode)||!chosen.equals(network)))throw new IllegalStateException("Stop the other node before changing networks.");
+        network=chosen;verifyEngine(true);requireEnvironment(true);
+        review.requireCurrent(network,getSharedPreferences("settings",MODE_PRIVATE).getString("producer-"+network,""),new KeyVault(this,network).publicKey());
+        SnapshotBootstrap.finishCompleted(this,chosen);
+        if(SnapshotBootstrap.pending(this,chosen))throw new IllegalStateException("Resume the unfinished chain download in step 3 first.");
+        rememberRun(review,request);
+        if(process==null)launch(false,null,request);
+        // The monitor promotes this reviewed run only after fresh local sync,
+        // registration, balance and allowance checks. Stop cancels the intent.
+        status("Starting node","Catching up and checking your saved producer. Mining starts automatically when the local chain, signing key and VHP checks pass. Stop node cancels startup.");
+    }
     private void startProducer(long request, String chosen, ProductionReview review) throws Exception {
         if (!OBSERVER.equals(mode) || process == null || !process.isAlive() || !chosen.equals(network)) throw new IllegalStateException("Run an observer on this network before enabling production.");
         verifyEngine(true); requireEnvironment(true);
@@ -329,7 +341,7 @@ public final class NodeService extends Service {
         rpc.checkProducer(account, publicKey);
         if("mainnet".equals(network)&&account.equals(getSharedPreferences("settings",MODE_PRIVATE).getString("vault-producer-mainnet",""))) {
             ProductionPermission.Snapshot permission=ProductionPermission.read(rpc::call,account,System.currentTimeMillis());
-            if(permission.allowance.signum()==0)throw new IllegalStateException("This KOIN Vault producer has no VHP production allowance. Keep the observer running. In Setup step 5, review VHP production permission, approve it in KOIN Vault, then Check VHP permission before starting production.");
+            if(permission.allowance.signum()==0)throw new IllegalStateException("This KOIN Vault producer has no VHP production allowance. Keep the observer running. In Setup step 2, review VHP production permission, approve it in KOIN Vault, then Check VHP permission before starting production.");
         }
         JSONObject head = rpc.call("chain.get_head_info", new JSONObject());
         synchronized (readiness) {
@@ -356,7 +368,7 @@ public final class NodeService extends Service {
     private void launch(boolean producer, ProductionReview review, long request) throws Exception {
         if (process != null && process.isAlive()) throw new IllegalStateException("A node is already running.");
         if (epoch.get() != request || stopRequested) return;
-        if (producer && review == null) throw new IllegalStateException("Review production in step 5 before starting.");
+        if (producer && review == null) throw new IllegalStateException("Review production in step 4 before starting.");
         String account = producer ? review.account : null;
         // Both native listeners can remain reserved by TCP TIME_WAIT after a
         // clean shutdown. Preserve strict checks and wait before key access.

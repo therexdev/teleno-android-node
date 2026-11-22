@@ -44,7 +44,8 @@ public final class PermissionTests {
         rejects(()->ProductionPermission.requireCurrent(s,s,s.balance.add(BigInteger.ONE),1100),"reject amount above balance");
         rejects(()->ProductionPermission.requireCurrent(s,s,BigInteger.ONE,121001),"expire review");
         rejects(()->ProductionPermission.requireCurrent(s,s,BigInteger.ONE,999),"reject clock reversal");
-        rejects(()->ProductionPermission.requireCurrent(s,new ProductionPermission.Snapshot(ACCOUNT,s.balance,BigInteger.ONE,1001),BigInteger.ONE,1100),"reject changed allowance");
+        ProductionPermission.requireCurrent(s,new ProductionPermission.Snapshot(ACCOUNT,s.balance,BigInteger.ONE,1001),BigInteger.ONE,1100);count++;
+        rejects(()->ProductionPermission.requireCurrent(s,new ProductionPermission.Snapshot(ACCOUNT,s.balance,s.allowance.add(BigInteger.ONE),1001),BigInteger.ONE,1100),"external allowance increase requires review");
         rejects(()->ProductionPermission.requireCurrent(s,new ProductionPermission.Snapshot(ProductionPermission.POB,s.balance,s.allowance,1001),BigInteger.ONE,1100),"reject changed owner");
         Rpc zero=new Rpc();zero.allowance="0";check(ProductionPermission.read(zero,ACCOUNT,1000).allowance.signum()==0,"protobuf default omission is zero");
         Rpc wrong=new Rpc();wrong.wrongChain=true;rejects(()->ProductionPermission.read(wrong,ACCOUNT,1000),"reject wrong chain before read");check(wrong.reads==0,"no token calls on wrong chain");
