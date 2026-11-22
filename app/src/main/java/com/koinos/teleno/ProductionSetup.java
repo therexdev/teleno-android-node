@@ -18,14 +18,11 @@ final class ProductionSetup {
         if (s.busy) return explain("The node is busy: " + s.phase + ". Wait for this operation to finish, then tap Review again.");
         if (s.producer) return explain("Block production is already active. See live status and the local block count at the top. Use Stop node to finish.");
         if (s.keyBusy) return explain("A signing-key operation is finishing. Tap Review again when it completes.");
-        if (!s.active && s.savedDownload) return explain("Resume or discard the unfinished chain download in step 2, then start the observer.");
-        if (!s.active) return new ProductionSetup(Action.START_OBSERVER, "Start an observer on " + s.networkLabel + " first. It will use your saved chain data and key. Wait for it to catch up before starting production.");
-        if (!s.observer || !s.sameNetwork) return explain("Run an observer on " + s.networkLabel + ". Stop the current node before changing networks.");
-        if (!s.ready) return explain("Production cannot start yet: " + (s.readiness.isEmpty() ? "Waiting for this observer's current chain status." : s.readiness)
-            + "\nKeep the observer running. This check updates automatically; you can tap Review again at any time.");
-        if (!s.hasAccount) return explain("Choose your producer account in step 3. A saved account address is enough; a live KOIN Vault connection is not required to start production.");
-        if (!s.hasKey) return explain("Create or import the block-signing key in step 4. Register its public key for this producer account before starting.");
-        return new ProductionSetup(Action.REVIEW, "Ready to review. Connect power, then tap below. VHP and the registered key will be checked on your synced node before starting. KOIN Vault background checks do not block this review.");
+        if (!s.active && s.savedDownload) return explain("Resume the unfinished chain download in step 3 before starting the node.");
+        if (s.active && (!s.observer || !s.sameNetwork)) return explain("Run an observer on " + s.networkLabel + ". Stop the current node before changing networks.");
+        if (!s.hasAccount) return explain("Connect your producer wallet in step 1. Your saved address is enough for later starts; a live Vault connection is not required to mine.");
+        if (!s.hasKey) return explain("Tap Start node to prepare and register this device's signing key. Existing signing keys are reused.");
+        return new ProductionSetup(Action.REVIEW, s.active&&!s.ready?"Start node will keep syncing and enable mining automatically when the local chain, key and VHP checks pass. "+s.readiness:"Start node reuses your saved chain and signing key, catches up, and enables mining automatically after fresh checks. Charging and a live Vault connection are optional.");
     }
     private static ProductionSetup explain(String note) { return new ProductionSetup(Action.EXPLAIN, note); }
 }

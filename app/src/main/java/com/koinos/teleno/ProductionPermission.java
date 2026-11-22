@@ -50,7 +50,7 @@ final class ProductionPermission {
     static void requireCurrent(Snapshot reviewed,Snapshot current,BigInteger value,long now){
         validate(value);
         if(!reviewed.account.equals(current.account)||now<reviewed.at||now-reviewed.at>120000)throw new IllegalStateException("The permission review expired or the account changed. Check permission and review again.");
-        if(!reviewed.allowance.equals(current.allowance))throw new IllegalStateException("The remaining allowance changed. Check permission and review the new value before replacing it.");
+        if(current.allowance.compareTo(reviewed.allowance)>0)throw new IllegalStateException("The remaining allowance increased. Check permission and review the new value before replacing it.");
         if(value.compareTo(current.balance)>0)throw new IllegalStateException("The allowance exceeds the current VHP balance. Choose a smaller amount.");
     }
     static String review(Snapshot s,BigInteger value){
@@ -58,6 +58,6 @@ final class ProductionPermission {
             +"\n\nRemaining allowance: "+WalletReader.amount(s.allowance.toString())+" VHP\nNew allowance: "+WalletReader.amount(value.toString())+" VHP"
             +"\n\nThis REPLACES the remaining allowance; it does not add to it. "
             +(value.signum()==0?"Once applied, PoB has no remaining VHP allowance for this account. Stop production before revoking.":"PoB can consume up to this amount of VHP during block production for KOIN rewards without asking for another passkey approval. It remains available until consumed or revoked; future deposits are not automatically added.")
-            +"\n\nNo tokens move in this approval transaction. The signing key gains no transfer authority. KOIN Vault will decode this single VHP approval and ask for your passkey. Return here and check permission before starting production.";
+            +"\n\nNo tokens move in this approval transaction. The signing key gains no transfer authority. KOIN Vault will decode this single VHP approval and ask for your passkey. Mining can consume the remaining allowance during review; the new amount stays fixed. Return here and check permission.";
     }
 }

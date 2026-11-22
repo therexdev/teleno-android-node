@@ -72,7 +72,8 @@ final class NodeStorage {
             File directory=folder(c,n,selected.id,gen); checkMarker(directory,gen); File[] targets=data(directory), links=slots(c,n);
             boolean rebase=false;
             for (int i=0;i<links.length;i++) {
-                if(!Files.isSymbolicLink(links[i].toPath()))throw new IOException("Storage routing is incomplete. Do not reset app data; keep the selected card inserted.");
+                if(!Files.exists(links[i].toPath(),LinkOption.NOFOLLOW_LINKS)){rebase=true;continue;}
+                if(!Files.isSymbolicLink(links[i].toPath()))throw new IOException("Storage routing needs attention. Use Find existing chain data; do not reset app data or download again yet.");
                 Path old=Files.readSymbolicLink(links[i].toPath());
                 if(!old.equals(targets[i].toPath())) {
                     if(!old.endsWith(Paths.get("teleno-chain",n+"-"+gen,targets[i].getName())))throw new IOException("Unexpected database routing. Data was preserved.");
@@ -80,6 +81,7 @@ final class NodeStorage {
                 }
             }
             if(rebase) {
+                File base=NodeConfig.root(c,n);if(!base.isDirectory()&&!base.mkdirs())throw new IOException("Could not repair the private node folder. The saved chain is preserved.");
                 int lock=NativeFiles.lock(new File(NodeConfig.root(c,n),"node.owner.lock").getPath());
                 try{StorageLinks.publish(links,targets,gen,index->syncPrivateDirectory(links[index].getParent()));}finally{NativeFiles.unlock(lock);}
             }
@@ -89,6 +91,78 @@ final class NodeStorage {
         Choice choice=resolve(c,volume(c,n));
         String gen=generation(c,n); if(!gen.isEmpty()) checkMarker(folder(c,n,choice.id,gen),gen);
         if (choice.free() < RESERVE) throw new IOException("The selected chain storage has less than 2 GiB free. Free space on " + choice.label + " before restarting.");
+    }
+    static boolean hasChain(Context c,String n) {
+        try {
+            String gen=generation(c,n);
+            return ChainData.usable(gen.isEmpty()?slots(c,n)[0]:data(folder(c,n,volume(c,n),gen))[0]);
+        }catch(Exception e){return false;}
+    }
+    static final class Existing {
+        final String volume,generation,label;final File db;final long bytes;
+        Existing(String volume,String generation,String label,File db,long bytes){this.volume=volume;this.generation=generation;this.label=label;this.db=db;this.bytes=bytes;}
+        String description(){return label+" · "+SnapshotDownload.gib(bytes)+" GiB\n"+db.getPath();}
+    }
+    static List<Existing> findExisting(Context c,String n)throws Exception {
+        NodeConfig.checkNetwork(n);List<Existing> out=new ArrayList<>();
+        File legacy=slots(c,n)[0];
+        if(ChainData.usable(legacy))out.add(new Existing("phone","","Phone storage · original database",legacy,StorageFiles.size(new File[]{legacy})));
+        for(Choice choice:choices(c)){
+            File parent=new File(choice.root,"teleno-chain");File[] dirs=parent.listFiles();if(dirs==null)continue;
+            for(File f:dirs){
+                String prefix=n+"-";if(!f.getName().matches(java.util.regex.Pattern.quote(prefix)+"[a-f0-9]{32}")||Files.isSymbolicLink(f.toPath()))continue;
+                String gen=f.getName().substring(prefix.length());
+                try{checkMarker(f,gen);File db=data(f)[0];if(ChainData.usable(db))out.add(new Existing(choice.id,gen,choice.label,db,StorageFiles.size(new File[]{db})));}
+                catch(IOException ignored){/* Incomplete downloads are never offered as reusable chains. */}
+            }
+        }
+        return out;
+    }
+    static boolean hasRecoverableChain(Context c,String n) {
+        try {
+            if(hasChain(c,n))return false;
+            File legacy=slots(c,n)[0];if(Files.isSymbolicLink(legacy.toPath()))return true;
+            for(Choice choice:choices(c)){
+                File[] dirs=new File(choice.root,"teleno-chain").listFiles();if(dirs==null)continue;
+                for(File f:dirs)if(f.getName().matches(java.util.regex.Pattern.quote(n+"-")+"[a-f0-9]{32}")&&ChainData.usable(new File(f,"db")))return true;
+            }
+        }catch(Exception ignored){}return false;
+    }
+    static void reconnect(Context c,String n,String selected,String gen)throws Exception {
+        NodeConfig.checkNetwork(n);File base=NodeConfig.root(c,n);base.mkdirs();
+        int lock=NativeFiles.lock(new File(base,"node.owner.lock").getPath());
+        try {
+            if(hasJournal(c,n))throw new IOException("An interrupted storage switch must finish first. Try Start observer to complete its saved recovery; do not delete the database.");
+            Choice choice=resolve(c,selected);
+            if(gen.isEmpty()){
+                if(!"phone".equals(selected)||!ChainData.usable(slots(c,n)[0]))throw new IOException("The original database is not available. No files were changed.");
+            }else{
+                File target=folder(c,n,selected,gen);checkMarker(target,gen);
+                if(!ChainData.usable(data(target)[0]))throw new IOException("This folder does not contain a complete RocksDB manifest. No files were changed.");
+                for(File slot:slots(c,n))if(Files.exists(slot.toPath(),LinkOption.NOFOLLOW_LINKS)&&!Files.isSymbolicLink(slot.toPath()))
+                    throw new IOException("An original database still occupies the node folder. Keep it and select that original copy; recovery will not overwrite it.");
+                // All targets were inspected before publishing. Existing directories are never deleted.
+                StorageLinks.publish(slots(c,n),data(target),gen,index->syncPrivateDirectory(slots(c,n)[index].getParent()));
+            }
+            SharedPreferences.Editor edit=prefs(c).edit().putString(n+"-volume",selected).putString(n+"-label",choice.label).putString(n+"-generation",gen).remove(n+"-validated");
+            JSONObject retained=new JSONObject(prefs(c).getString(n+"-retained","{}"));
+            if(gen.equals(retained.optString("generation","-"))&&selected.equals(retained.optString("volume","-")))edit.remove(n+"-retained");
+            if(!edit.commit())throw new IOException("The existing chain was found, but its selection could not be saved. No database files were deleted. Retry recovery.");
+            if(!hasChain(c,n))throw new IOException("The selected chain could not be read. Existing files were preserved.");
+        }finally{NativeFiles.unlock(lock);}
+    }
+    static boolean completeGeneration(Context c,String n,String selected,String gen) {
+        try{File directory=folder(c,n,selected,gen);checkMarker(directory,gen);return ChainData.usable(data(directory)[0]);}
+        catch(Exception e){return false;}
+    }
+    static void protectReferences(Context c,String n,File removal)throws IOException {
+        for(File slot:slots(c,n))if(Files.exists(slot.toPath(),LinkOption.NOFOLLOW_LINKS))ChainData.protectActive(slot,removal);
+        if(!generation(c,n).isEmpty())ChainData.protectActive(folder(c,n,volume(c,n),generation(c,n)),removal);
+    }
+    static String report(Context c,String n) {
+        return "Chain storage: "+label(c,n)+"\nSaved storage volume: "+volume(c,n)+"\nSaved generation: "+generation(c,n)
+            +"\nChain manifest present: "+hasChain(c,n)+"\nOther saved chain found: "+hasRecoverableChain(c,n)
+            +"\nNode folder: "+NodeConfig.root(c,n).getPath()+"\nBackup retained: "+retained(c,n)+"\nSnapshot record present: "+SnapshotBootstrap.pending(c,n);
     }
     private static void probe(File directory) throws Exception {
         if (!directory.mkdirs() && !directory.isDirectory()) throw new IOException("Could not create chain storage on this device.");
@@ -173,12 +247,17 @@ final class NodeStorage {
         ensureReady(c,n); if(!canClean(c,n)) throw new IOException("First validate an advancing observer on the new storage, then stop it.");
         int lock=NativeFiles.lock(new File(NodeConfig.root(c,n),"node.owner.lock").getPath());
         try {
+            if(!hasChain(c,n))throw new IOException("The active chain is not readable. Backup deletion is blocked; use Find existing chain data first.");
+            File[] active=generation(c,n).isEmpty()?slots(c,n):data(folder(c,n,volume(c,n),generation(c,n)));
             JSONObject old=new JSONObject(prefs(c).getString(n+"-retained","{}")); String gen=old.getString("generation");
             if(gen.isEmpty()) {
-                String tag=token(old.getString("backup")); for(File slot:slots(c,n)) StorageFiles.deleteTree(new File(slot.getParentFile(),".previous-"+tag+"-"+slot.getName()));
+                String tag=token(old.getString("backup"));
+                for(File slot:slots(c,n)){File removal=new File(slot.getParentFile(),".previous-"+tag+"-"+slot.getName());for(File current:active)ChainData.protectActive(current,removal);}
+                for(File slot:slots(c,n))StorageFiles.deleteTree(new File(slot.getParentFile(),".previous-"+tag+"-"+slot.getName()));
             } else {
                 if(gen.equals(generation(c,n))) throw new IOException("Refusing to remove the active database.");
-                StorageFiles.deleteTree(folder(c,n,old.getString("volume"),gen));
+                File removal=folder(c,n,old.getString("volume"),gen);for(File current:active)ChainData.protectActive(current,removal);
+                StorageFiles.deleteTree(removal);
             }
             if(!prefs(c).edit().remove(n+"-retained").commit()) throw new IOException("Cleanup finished; its saved status could not be updated.");
         } finally { NativeFiles.unlock(lock); }

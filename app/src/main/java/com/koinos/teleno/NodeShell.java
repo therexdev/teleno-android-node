@@ -91,7 +91,10 @@ final class NodeShell {
             +"\nSelected wallet: "+(data==null||data.account.isEmpty()?"not selected":data.account)
             +"\nLocal block: "+node.height+"\nIrreversible: "+node.lib+"\nLocal block age: "+age
             +"\nPeers: "+(node.peers<0?"not reported":node.peers)+"\nLocal blocks this run: "+node.localBlocks
-            +"\nChain readiness: "+node.readiness
+            +"\nChain readiness: "+node.readiness+"\n"+NodeStorage.report(activity,node.network)
+            +"\nAutomatic recovery requested: "+NodeService.resumeRequested(activity)
+            +"\nBattery optimization exempt: "+activity.getSystemService(android.os.PowerManager.class).isIgnoringBatteryOptimizations(activity.getPackageName())
+            +"\nLast interruption / stop: "+activity.getSharedPreferences("settings",0).getString("last-run-reason","not recorded")
             +(node.hasSample?"\nChain sample age: "+((now-node.sampleAt)/1000)+"s":"\nNo chain sample yet")
             +"\n\n"+(node.active&&NodeService.PRODUCER.equals(node.mode)?"Current production telemetry":"Retained telemetry / production is not active")
             +"\n"+node.production.report(SystemClock.elapsedRealtime())
@@ -107,7 +110,7 @@ final class NodeShell {
         AlertDialog.Builder dialog=new AlertDialog.Builder(activity).setTitle("Activity details").setMessage(detail+(WalletReader.id(e.id)?"\n\n"+e.id:"")).setPositiveButton("Done",null);
         if(WalletReader.id(e.id))dialog.setNeutralButton("Copy ID",(a,b)->((ClipboardManager)activity.getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Public chain record",e.id)));dialog.show();
     }
-    void showWalletDetails(){if(data==null||data.account.isEmpty()){setup(3);return;}WalletReader.Balance b=data.balance;String message=data.account+(b==null?"\n\nBalances unavailable.":"\n\nKOIN: "+WalletReader.amount(b.koin)+"\nVHP: "+WalletReader.amount(b.vhp)+"\nAvailable mana: "+WalletReader.amount(b.mana)+"\n\nLast read: "+DateFormat.getDateTimeInstance().format(new Date(b.at))+"\nSource: "+b.source+"\n\nDashboard amounts are shortened; these values show full precision.");
-        new AlertDialog.Builder(activity).setTitle("Node wallet · "+data.network).setMessage(message).setPositiveButton("Done",null).setNeutralButton("Copy address",(a,c)->((ClipboardManager)activity.getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Producer address",data.account))).setNegativeButton("Wallet setup",(a,c)->setup(3)).show();
+    void showWalletDetails(){if(data==null||data.account.isEmpty()){setup(1);return;}WalletReader.Balance b=data.balance;String message=data.account+(b==null?"\n\nBalances unavailable.":"\n\nKOIN: "+WalletReader.amount(b.koin)+"\nVHP: "+WalletReader.amount(b.vhp)+"\nAvailable mana: "+WalletReader.amount(b.mana)+"\n\nLast read: "+DateFormat.getDateTimeInstance().format(new Date(b.at))+"\nSource: "+b.source+"\n\nDashboard amounts are shortened; these values show full precision.");
+        new AlertDialog.Builder(activity).setTitle("Node wallet · "+data.network).setMessage(message).setPositiveButton("Done",null).setNeutralButton("Copy address",(a,c)->((ClipboardManager)activity.getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Producer address",data.account))).setNegativeButton("Wallet setup",(a,c)->setup(1)).show();
     }
 }

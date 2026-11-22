@@ -32,6 +32,8 @@ public final class VaultTests {
         check(c.openUrl().equals("https://koinvault.app/#connect="+"A".repeat(24)+"&secret="+"B".repeat(43)),"fixed origin and fragment; server URL ignored");
         c.refresh();check(c.view().connected&&c.view().address.equals(ACCOUNT),"approved account selected");
         check(c.openUrl().equals(VaultClient.HOME),"connected wallet uses plain reopen URL");
+        VaultClient reopened=client(f,d);reopened.refresh();reopened.connect();
+        check(reopened.view().connected&&f.creates==1,"approved encrypted session reused after app restart and Connect, without new pairing");
         c.register(ACCOUNT,pub);check(c.view().pending&&f.requests==1,"one registration request");
         JSONObject op=f.sent.getJSONArray("operations").getJSONObject(0).getJSONObject("call_contract");
         check(op.getLong("entry_point")==1394158561L&&op.getString("contract_id").equals("159myq5YUhhoVWu3wsHKHiJYKPKGUrGiyv"),"only official Mainnet public-key registration");
@@ -84,6 +86,9 @@ public final class VaultTests {
         rejects(()->block.approveProductionAllowance(ACCOUNT,WalletReader.UINT_MAX,()->{}),"unlimited cannot reach transport");
         rejects(()->block.approveProductionAllowance(ACCOUNT,budget,null),"missing current review rejected");check(blocked.requests==0,"no requests for rejected reviews");
         blockedDisk.fail=true;rejects(()->block.approveProductionAllowance(ACCOUNT,budget,()->{}),"no allowance without durable state");check(blocked.requests==0,"disk failure prevents allowance POST");
+        Disk expiryDisk=new Disk();Fake expiry=new Fake();VaultClient exp=client(expiry,expiryDisk);exp.connect();exp.refresh();expiry.now+=1800001;exp.refresh();
+        check(!exp.view().connected&&exp.view().note.contains("30-minute")&&exp.view().note.contains("node can keep running"),"expiry explains reconnect without stopping miner");
+        exp.connect();exp.refresh();check(expiry.creates==2&&exp.view().connected,"expired session renews only after explicit Connect");
         Disk oldState=new Disk();oldState.data.put("pending",new JSONObject().put("account",ACCOUNT).put("publicKey",Base64.getUrlEncoder().withoutPadding().encodeToString(pub)).put("status","pending"));
         VaultClient migrated=client(new Fake(),oldState);check(migrated.view().kind.equals(VaultClient.REGISTRATION),"legacy pending records remain registrations");migrated.observed(ACCOUNT,pub);
         System.out.println("PASS: "+count+" wallet protocol, wire-format and recovery assertions (fixture transport; no live signing).");

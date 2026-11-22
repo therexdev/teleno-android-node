@@ -6,51 +6,52 @@ chain snapshot downloads and reward history. Docker, WSL and root are not requir
 
 ## Download
 
-**Latest version: 0.3.8 (build 16), including Silent Mode.**
+Published download: [Teleno Node 0.3.8 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8.apk).
 
-- [Download Teleno Node 0.3.8 APK](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8.apk)
-- [Download the matching 0.3.8 source archive](https://raw.githubusercontent.com/therexdev/teleno-android-node/main/releases/0.3.8/Teleno-Node-0.3.8-source.zip)
-- [SHA-256 checksums](releases/0.3.8/SHA256SUMS.txt)
-- [0.3.8 release notes and Silent Mode instructions](releases/0.3.8/RELEASE_NOTES.md)
+**Prepared update: 0.3.12 (build 20)** streamlines setup into Connect wallet →
+Burn KOIN to VHP → Restore/download chain → Start node. Home's Start node uses the
+same complete startup flow: prepare/register a signing key when needed, catch up,
+and enable mining automatically after local checks. Burns and optional exact VHP
+allowances work while mining and before the chain is downloaded. Battery operation,
+mobile-data consent, existing-chain recovery and automatic mining recovery remain
+included.
 
-The APK and matching source are committed in this repository under
-[`releases/0.3.8`](releases/0.3.8). The links above download version 0.3.8 directly.
-The unchanged native engine can be rebuilt using the
-[0.3.7 native materials](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7-native-materials.zip).
+The signed APK, matching source and checksums are supplied separately in ChatGPT.
+Source and release metadata are in [draft PR #1](https://github.com/therexdev/teleno-android-node/pull/1);
+the 0.3.12 binary is not published to GitHub. Physical-device validation is pending.
 
-Requires **Android 9 or newer and an ARM64 device**. Chain data requires substantial
-free storage; Setup shows the space required for the selected snapshot. Removable
-storage is offered when Android exposes a suitable app-specific SD-card location.
-
-To update, stop the node and install the APK over the existing app. Version 0.3.8
-uses package `com.koinos.teleno`, version code **16** and the same signing
-certificate as the earlier installers. Keep the existing app and its data.
-
-## What changed in 0.3.8
-
-- Added **Silent Mode** beside Start/Stop on Home.
-- A pure-black fullscreen screensaver shows a dim, slowly moving box whose color
-  changes gradually. It displays the clock, latest finalized reward and date/time,
-  confirmed KOIN rewards this production run, reward count and a short node status.
-- Silent Mode keeps the display awake and caps this window's brightness at 5%.
-  Tap anywhere to return to Home; normal brightness and system bars return.
-- Rotation preserves Silent Mode. Backgrounding pauses the screensaver and releases
-  its screen policy; returning resumes it. Entering/exiting never restarts the node.
+Requires **Android 9 or newer and ARM64**. Stop the node and install the update
+over the existing app; do not uninstall or clear its data. Package
+`com.koinos.teleno`, version code **20**, retains the same signing certificate.
 
 ## Use the app
 
-1. In **Setup**, choose the network and storage location.
-2. Download and restore a public chain snapshot, or start an observer to sync normally.
-3. Connect KOIN Vault and choose the node wallet if you want to produce blocks.
-4. Create or import the device's block-signing key, approve its registration in the
-   wallet, and check registration after the observer catches up.
-5. Check VHP production permission, review any required allowance in the wallet,
-   then review and start block production.
+1. **Connect wallet.** Approve the connection in KOIN Vault. Existing accounts
+   and network choices are kept; new installations select Mainnet.
+2. **Burn KOIN to VHP.** Review the exact amount and optionally approve a fixed VHP
+   production allowance in the same wallet transaction. Skip burning if you already
+   have VHP and use the production-permission controls as needed.
+3. **Restore or download chain.** Reuse saved data or find an intact database.
+   Optional snapshot downloads show their size before Wi-Fi/mobile-data consent.
+4. **Start node** in Setup or Home. The app handles signing-key setup/registration
+   when needed, syncs, and enables mining after fresh local checks. Stop cancels
+   startup and automatic recovery. Charging is optional.
+
+Wallet transaction approvals remain explicit. Vault connections currently expire
+30 minutes after creation, so reconnect for a new wallet transaction after expiry.
+The saved producer and device signing key can keep mining without a live wallet
+connection. Burning and renewing VHP permission do not stop the running producer;
+revoking permission requires stopping it. Extra signing-key, device and observer
+controls are expandable in Setup.
+
+See [0.3.12 release notes](releases/0.3.12/RELEASE_NOTES.md).
+The unchanged native engine can be rebuilt from the
+[0.3.7 native materials](https://github.com/therexdev/teleno-android-node/releases/download/v0.3.7/Teleno-Node-0.3.7-native-materials.zip).
 
 An observer does not need a wallet. Mainnet wallet approvals remain in KOIN Vault.
 The app checks chain readiness, account selection, key registration and production
 permissions before starting. VHP allowances are explicit wallet-approved actions;
-the app does not automatically burn KOIN or transfer funds.
+burns always require an explicit review and separate wallet approval.
 
 **Home** shows time/date, KOIN, VHP, mana, block height, peers, local blocks this run,
 device readings and recent finalized rewards. Its actions are Start/Stop and Silent Mode.
@@ -71,10 +72,10 @@ includes pinned source archives, all 171 link inputs, licenses and instructions
 for relinking with replacement libraries. APK-signing keys and wallet data are
 not distributed.
 
-Release validation covers 20 Robolectric tests, package/version checks, APK
+Release validation covers 41 Robolectric tests, package/version checks, APK
 signature verification, 16 KiB alignment and unchanged native engine hashes.
-No physical Android device or overnight connection test was available.
-See [validation details](releases/0.3.8/validation.json).
+No physical Android device, overnight connection test or live burn transaction was available.
+See [validation details](releases/0.3.11/validation.json).
 
 Publisher certificate SHA-256:
 

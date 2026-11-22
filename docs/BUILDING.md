@@ -21,8 +21,8 @@ python3 tools/build-apk.py \
   --unsigned
 ```
 
-Output: `build/Teleno-Node-0.3.8-unsigned.apk`. Sign your own build with
-`apksigner sign --ks /private/path/app-signing.keystore --out Teleno-Node.apk build/Teleno-Node-0.3.8-unsigned.apk`.
+Output: `build/Teleno-Node-0.3.11-unsigned.apk`. Sign your own build with
+`apksigner sign --ks /private/path/app-signing.keystore --out Teleno-Node.apk build/Teleno-Node-0.3.11-unsigned.apk`.
 Then run `apksigner verify --verbose Teleno-Node.apk` and
 `zipalign -c -P 16 4 Teleno-Node.apk` using the SDK build-tools.
 Only an APK signed with the existing installation's certificate can update it.
@@ -38,7 +38,7 @@ Build the APK first, then follow [the UI test instructions](../tests/ui/README.m
 `tools/test-host.sh` runs the native/Java host tests with the Android NDK and ECJ
 paths supplied in `TELENO_ANDROID_NDK` and `TELENO_ECJ`.
 
-The 0.3.8 APK passes 20 Robolectric UI tests and APK identity, signature, native
+The 0.3.11 APK passes 41 Robolectric UI/service/storage tests and APK identity, signature, native
 payload and alignment checks. No physical Android device was connected for this
 release. The screensaver does not change engine qualification or
 bypass the existing production-readiness and wallet-approval checks.
@@ -98,7 +98,7 @@ ELF ABI/interpreter/16 KiB alignment, signs with the supplied certificate, and
 verifies the APK signature and ZIP alignment. It requires an existing keystore
 and never includes or generates one. Preserve that same identity for updates.
 With `--unsigned` instead of `--keystore`, it writes an aligned, non-installable
-`Teleno-Node-0.3.8-unsigned.apk` for later signing.
+`Teleno-Node-0.3.11-unsigned.apk` for later signing.
 
 The supplied native relink bundle includes the Android engine used in this APK.
 A Linux/glibc ARM64 binary is rejected. The resulting APK still leaves production
@@ -167,7 +167,7 @@ auxiliary include copy excluding `google/` and `openssl/`.
 `tools/build-engine.py` contains the final configure/build invocation. It requires
 the completed Android Koinos SDK and auxiliary prefixes, the prepared Teleno
 source, and the libssh/GMP/zstd/RocksDB/cpp-libp2p installations. It does not
-download a substitute binary or mark the result production-qualified. Validation for the published APK is recorded in `releases/0.3.8/validation.json`.
+download a substitute binary or mark the result production-qualified. Validation for the published APK is recorded in `releases/0.3.11/validation.json`.
 The complete Koinos SDK, cpp-libp2p, patched protobuf/RocksDB runtime, Teleno node
 and private-testnet key generator have now built successfully for Android ARM64.
 `native/AndroidKoinosPrelude.cmake` maps soralog's separate desktop `pthread`

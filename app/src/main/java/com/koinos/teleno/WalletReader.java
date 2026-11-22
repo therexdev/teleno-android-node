@@ -54,7 +54,7 @@ final class WalletReader {
     }
     private String balance(String contract,byte[] args) throws Exception {
         JSONObject r=rpc.call("chain.read_contract",new JSONObject().put("contract_id",contract).put("entry_point",1550980247L).put("args",b64(args)));
-        return Proto.valueUint64(unb64(r.getString("result"))).toString();
+        return Proto.valueUint64(ProductionPermission.result(r)).toString();
     }
     static final class Entry {
         String id,seq="0",kind="action",title,detail="",koin="0",vhp="0";long time,height;

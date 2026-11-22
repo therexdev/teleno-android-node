@@ -70,7 +70,7 @@ final class SnapshotDownload {
                 } catch(NetworkFailure failure) {
                     IOException error=failure.failure;
                     if(!source.retryable(error))throw error;
-                    if(retries++>=4)throw new IOException("Snapshot download paused after 4 automatic reconnects. Saved file portions and verified files are kept. Check Wi-Fi, then tap Resume chain download.",error);
+                    if(retries++>=4)throw new IOException("Snapshot download paused after 4 automatic reconnects. Saved file portions and verified files are kept. Check your connection, then tap Resume chain download.",error);
                     if(!source.resumable()||error instanceof RangeRestart){if(part.exists()&&!part.delete())throw new IOException("Could not reset the current download file.");received=0;digest.reset();}
                     long wait=1000L*(1<<retries);
                     while(wait>0){progress.update("Reconnecting secure download · attempt "+retries+"/4 in "+((wait+999)/1000)+"s",done+received,plan.bytes,count,plan.database.size());long step=Math.min(wait,200);pause.waitMillis(step);wait-=step;}
@@ -86,6 +86,15 @@ final class SnapshotDownload {
         try(InputStream in=new FileInputStream(new File(db,"CURRENT"))){current=new String(read(in,256),StandardCharsets.US_ASCII);}
         if(!current.matches("MANIFEST-[0-9]+\n")||!allowed.contains(current.trim())||!new File(db,current.trim()).isFile())throw new IOException("The restored RocksDB manifest pointer is invalid.");
         progress.update("Snapshot verified",done,plan.bytes,count,plan.database.size());
+    }
+    static long estimatedRemaining(SnapshotPlan plan,File generation)throws IOException {
+        long remaining=plan.bytes;
+        for(SnapshotPlan.Entry e:plan.database){
+            File file=new File(generation,e.path),partial=new File(file+".download-part");
+            if(Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS)&&file.length()==e.size)remaining-=e.size;
+            else if(Files.isRegularFile(partial.toPath(),LinkOption.NOFOLLOW_LINKS))remaining-=Math.min(e.size,partial.length());
+        }
+        return Math.max(0,remaining);
     }
     static String gib(long bytes){return String.format(Locale.ROOT,"%.2f",bytes/1073741824.0);}
 }
