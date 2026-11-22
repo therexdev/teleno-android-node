@@ -49,9 +49,9 @@ compile_classpath = os.pathsep.join(str(p.resolve()) for p in
                                     compile_jars + [compiled, args.classes])
 subprocess.run(['java', '-jar', str(args.ecj.resolve()), '-17', '-nowarn',
                 '-cp', compile_classpath, '-d', str(compiled),
-                str(root / 'tests/ui/UiSmokeTest.java')], check=True)
+                str(root / 'tests/ui/LiteUiTest.java')], check=True)
 subprocess.run(['java', '-Xmx2g',
                 '-Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2',
                 '-Dteleno.ui.output=' + str(args.output.resolve()),
                 '-cp', classpath, 'org.junit.runner.JUnitCore',
-                'com.koinos.teleno.UiSmokeTest'], check=True)
+                'com.koinos.teleno.LiteUiTest'], check=True)

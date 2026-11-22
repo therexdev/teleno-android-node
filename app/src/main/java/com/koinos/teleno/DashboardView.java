@@ -27,7 +27,7 @@ final class DashboardView extends LinearLayout {
         super(a);activity=a;landscape=a.getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
         setOrientation(VERTICAL);setPadding(d(landscape?24:20),d(12),d(landscape?24:20),d(12));setTag("home-dashboard");
         LinearLayout header=row(a),identity=column(a),time=column(a);identity.setGravity(Gravity.CENTER_VERTICAL);time.setGravity(Gravity.RIGHT);
-        TextView brand=label("TELENO",TEAL);brand.setTextSize(12);brand.setLetterSpacing(.22f);identity.addView(brand);
+        TextView brand=label("TELENO LITE",TEAL);brand.setTextSize(12);brand.setLetterSpacing(.22f);identity.addView(brand);
         network=label("MAINNET",MUTED);network.setTextSize(10);gap(identity,5);identity.addView(network);
         header.addView(identity,new LayoutParams(0,-1,1));clock=value("—",28,"home-clock");clock.setGravity(Gravity.RIGHT);time.addView(clock,new LayoutParams(-1,d(32)));
         date=text(a,"",11,MUTED,false);date.setSingleLine(true);date.setGravity(Gravity.RIGHT);time.addView(date);
@@ -102,7 +102,7 @@ final class DashboardView extends LinearLayout {
         changed(block,scoped&&node.hasSample?NumberFormat.getIntegerInstance().format(node.height):"—");block.setTextColor(fresh?INK:MUTED);
         changed(peers,scoped&&node.peers>=0?Integer.toString(node.peers):"—");changed(produced,scoped?Long.toString(node.localBlocks):"—");
         changed(toggle,node.active?"Stop node":node.busy?"Stop task":"Start node");toggle.setEnabled(node.active||node.busy?canStop:canStart);
-        toggle.setContentDescription(node.active?"Stop the local node":node.busy?"Stop the current node task":"Start the node as an observer. Enable production in Setup.");
+        toggle.setContentDescription(node.active?"Stop the local node":node.busy?"Stop the current node task":"Show Teleno Node Lite preview status. Compact mining is not available yet.");
         WalletReader.Balance b=data.balance;boolean saved=b!=null&&(!data.balanceError.isEmpty()||now-b.at>90000);
         changed(koin,b==null?"—":WalletReader.compact(b.koin));changed(vhp,b==null?"—":WalletReader.compact(b.vhp));changed(balanceState,saved?"Saved":b==null?"Awaiting wallet":"");
         int percent=b==null?0:WalletReader.percent(b.mana,b.koin);changed(mana,b==null?"—":percent+"%");manaBar.setProgress(percent,foreground&&ValueAnimator.areAnimatorsEnabled());

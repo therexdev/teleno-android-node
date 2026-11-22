@@ -1,0 +1,17 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): false
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Teleno Development, O=Development Only, C=US
+Signer #1 certificate SHA-256 digest: 05db99a3f860721985cf7999e3503c6f652b3104a4e86750bcdb0553a00e71e1
+Signer #1 certificate SHA-1 digest: 66103f808d98b5614ef1a484ae54eb637ef87047
+Signer #1 certificate MD5 digest: 29e0252356af07475bd89e952ee8d6ab
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 3072
+Signer #1 public key SHA-256 digest: 31eaccd5e85b0d308038a0233fdda9a5c212fbfdec4a95440ca3d18b4f9ead2c
+Signer #1 public key SHA-1 digest: 1868d5cfcb08c744fd792297fda6a094fd67f5cc
+Signer #1 public key MD5 digest: b1c3aadd7eca277a047c47add661698b

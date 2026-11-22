@@ -9,8 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 final class NodeConfig {
-    static final int RPC_PORT = 18085;
-    static final int P2P_PORT = 18888;
+    static final int RPC_PORT = 28085;
+    static final int P2P_PORT = 28888;
     static final String COMMIT = "2c11229267cff2f9ee39ed8e56ab70af391d85ce";
     static void checkNetwork(String n) { if (!"mainnet".equals(n) && !"harbinger".equals(n)) throw new IllegalArgumentException("Unknown network."); }
     static String chainId(String n) { checkNetwork(n); return n.equals("mainnet") ? "EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA==" : "EiBncD4pKRIQWco_WRqo5Q-xnXR7JuO3PtZv983mKdKHSQ=="; }

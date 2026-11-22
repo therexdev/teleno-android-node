@@ -50,7 +50,7 @@ final class VaultClient {
         if(unresolved()) throw new IllegalStateException("Resolve the saved wallet request before reconnecting. It will not be sent again automatically.");
         JSONObject cfg=transport.call("config",null); JSONObject features=cfg.optJSONObject("features");
         if(cfg.optBoolean("demo",true)||!"mainnet".equals(cfg.optString("network"))||features==null||!features.optBoolean("kaiProducer")) throw new IllegalStateException("KOIN Vault producer connections are currently available on live Mainnet only.");
-        JSONObject made=transport.call("dapp/create",new JSONObject().put("name","KAI Teleno · Android node").put("icon",ORIGIN+"/favicon.ico").put("protocolVersion",2));
+        JSONObject made=transport.call("dapp/create",new JSONObject().put("name","Teleno Node Lite · Android miner").put("icon",ORIGIN+"/favicon.ico").put("protocolVersion",2));
         token(made.optString("sessionId"),24);token(made.optString("secret"),43);
         long expiry=made.optLong("expiresAt");
         if(made.optInt("protocolVersion")!=2 || expiry<=clock.now() || expiry>clock.now()+31*60000L) throw new IllegalStateException("KOIN Vault needs its secure connection update. No legacy URL credentials will be used.");

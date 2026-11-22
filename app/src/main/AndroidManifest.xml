@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.koinos.teleno" android:versionCode="20" android:versionName="0.3.12">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.koinos.teleno.lite" android:versionCode="1" android:versionName="0.1.0">
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="36" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -11,26 +11,26 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <application android:label="Teleno Node" android:theme="@style/AppTheme"
-        android:icon="@drawable/ic_node" android:allowBackup="false" android:fullBackupContent="false"
+    <application android:label="Teleno Node Lite" android:theme="@style/AppTheme"
+        android:icon="@drawable/ic_node_lite" android:allowBackup="false" android:fullBackupContent="false"
         android:dataExtractionRules="@xml/no_backup" android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security" android:usesCleartextTraffic="false"
         android:debuggable="false" android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name="com.koinos.teleno.MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <receiver android:name=".NodeRestartReceiver" android:exported="false">
+        <receiver android:name="com.koinos.teleno.NodeRestartReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-        <service android:name=".NodeService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="specialUse">
+        <service android:name="com.koinos.teleno.NodeService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-started local Koinos blockchain full node with continuous peer-to-peer validation; visible stop control; resumes only a saved user-started run after interruptions or reboot." />
+                android:value="User-started local Teleno Node Lite blockchain node with continuous peer-to-peer validation; visible stop control; resumes only a saved user-started run after interruptions or reboot." />
         </service>
     </application>
 </manifest>

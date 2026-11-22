@@ -60,7 +60,7 @@ final class BurnKoin {
         if(approve)ops.put(ProductionPermission.operation(account,allowance(s,amount)));return ops;
     }
     static String review(Snapshot s,BigInteger amount,boolean approve) {
-        return "Network: Mainnet\nWallet / VHP recipient: "+s.permission.account+"\nKOIN contract: "+s.koinContract+"\nOfficial PoB: "+ProductionPermission.POB
+        return "Lite preview: mining is not available yet. This burn does not enable Lite mining.\n\nNetwork: Mainnet\nWallet / VHP recipient: "+s.permission.account+"\nKOIN contract: "+s.koinContract+"\nOfficial PoB: "+ProductionPermission.POB
             +"\n\nBurn: "+WalletReader.amount(amount.toString())+" KOIN\nReceive: "+WalletReader.amount(amount.toString())+" VHP at the same address"
             +"\nEstimated VHP balance after burn: "+WalletReader.amount(allowance(s,amount).toString())+" VHP"
             +(approve?"\n\nReplace PoB VHP production allowance: "+WalletReader.amount(s.permission.allowance.toString())+" → "+WalletReader.amount(allowance(s,amount).toString())+" VHP\nThis permits PoB to consume that exact VHP amount for block production until used or revoked.":"\n\nThe existing VHP production allowance will stay unchanged. Approve the new amount separately in step 5 when needed.")

@@ -384,7 +384,7 @@ public class UiSmokeTest {
     manager.setNetworkCapabilities(active,mobile);assertSame(active,NetworkPolicy.downloadNetwork(context,false));
   }
   static File savedChain(android.content.Context context,String network,String gen)throws Exception {
-    File folder=new File(context.getNoBackupFilesDir(),"teleno-chain/"+network+"-"+gen);new File(folder,"db").mkdirs();new File(folder,"blockchain").mkdirs();
+    File folder=new File(context.getNoBackupFilesDir(),"teleno-lite-chain/"+network+"-"+gen);new File(folder,"db").mkdirs();new File(folder,"blockchain").mkdirs();
     Files.writeString(new File(folder,"storage.id").toPath(),gen);Files.writeString(new File(folder,"db/CURRENT").toPath(),"MANIFEST-000001\n");Files.writeString(new File(folder,"db/MANIFEST-000001").toPath(),"saved chain fixture");return folder;
   }
   @Test public void savedPhoneChainIsFoundAfterSelectionWasLost()throws Exception {

@@ -26,7 +26,7 @@ final class KeyVault {
     KeyVault(Context c, String network) {
         NodeConfig.checkNetwork(network);
         file = new File(c.getNoBackupFilesDir(), "signer-" + network + ".gcm");
-        alias = "teleno-block-signer-v1-" + network;
+        alias = "teleno-lite-block-signer-v1-" + network;
     }
     boolean exists() { return file.isFile() || new File(file + ".bak").isFile(); }
     private SecretKey wrappingKey(boolean create) throws Exception {

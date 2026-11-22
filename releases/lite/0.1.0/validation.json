@@ -1,0 +1,36 @@
+{
+  "version": "0.1.0",
+  "version_code": 1,
+  "package": "com.koinos.teleno.lite",
+  "label": "Teleno Node Lite",
+  "verified_at": "2026-11-22T04:32:37.748418+00:00",
+  "foundation_parent": "baac73a3783d4b0b07a5cec56c7df40cd9ad1594",
+  "apk_sha256": "318ef687895b7587b48a631555efd571b33c2fd86780921ef1ec0b8889ba3648",
+  "apk_bytes": 4993495,
+  "signing_certificate_sha256": "05db99a3f860721985cf7999e3503c6f652b3104a4e86750bcdb0553a00e71e1",
+  "signature_scheme": "v3",
+  "zip_alignment_16k": true,
+  "native_bridge_and_supervisor_unchanged": true,
+  "standard_engine_bundled": false,
+  "compact_mining_ready": false,
+  "ui_tests_passed": 7,
+  "ui_tests_failed": 0,
+  "host_assertions": {
+    "VaultTests": 102,
+    "BurnRecoveryTests": 130,
+    "PermissionTests": 48
+  },
+  "app_source_sha256": "11388710656a30a3a1d197e8664ad7e73175c6b66ed427ba9df1f45739ca2e42",
+  "standard_app_source_sha256": "743dbad19d237987125cd6d85b5992f655a9fa2db01731d84dacf0d09373f619",
+  "standard_app_unchanged": true,
+  "standard_branch_unchanged": true,
+  "physical_device_tested": false,
+  "co_installation_tested_on_device": false,
+  "wallet_transactions_submitted": false,
+  "known_limits": [
+    "Foundation preview only: no compact engine or Lite snapshot is available yet.",
+    "Physical Android co-installation, Keystore separation and uninstall behavior need validation.",
+    "The minimum storage footprint and growth limit for compact mining are not measured."
+  ],
+  "source_archive_sha256": "fc900e03915233a3969c4884c1e6cd1a9360fba2f13118eab43316f6b716fa4f"
+}

@@ -43,7 +43,7 @@ final class NodeStorage {
     static long free(Context c, String n) throws IOException { return resolve(c, volume(c,n)).free(); }
     private static String token(String value) throws IOException { if (!value.matches("[a-f0-9]{32}")) throw new IOException("Invalid storage record. Data was preserved."); return value; }
     static File folder(Context c, String n, String volume, String gen) throws IOException {
-        NodeConfig.checkNetwork(n); return new File(resolve(c,volume).root, "teleno-chain/" + n + "-" + token(gen));
+        NodeConfig.checkNetwork(n); return new File(resolve(c,volume).root, "teleno-lite-chain/" + n + "-" + token(gen));
     }
     private static File[] slots(Context c, String n) { File base = NodeConfig.root(c,n); return new File[]{new File(base,"db"),new File(base,"chain/blockchain")}; }
     private static File[] data(File directory) { return new File[]{new File(directory,"db"),new File(directory,"blockchain")}; }
@@ -76,7 +76,7 @@ final class NodeStorage {
                 if(!Files.isSymbolicLink(links[i].toPath()))throw new IOException("Storage routing needs attention. Use Find existing chain data; do not reset app data or download again yet.");
                 Path old=Files.readSymbolicLink(links[i].toPath());
                 if(!old.equals(targets[i].toPath())) {
-                    if(!old.endsWith(Paths.get("teleno-chain",n+"-"+gen,targets[i].getName())))throw new IOException("Unexpected database routing. Data was preserved.");
+                    if(!old.endsWith(Paths.get("teleno-lite-chain",n+"-"+gen,targets[i].getName())))throw new IOException("Unexpected database routing. Data was preserved.");
                     rebase=true;
                 }
             }
@@ -108,7 +108,7 @@ final class NodeStorage {
         File legacy=slots(c,n)[0];
         if(ChainData.usable(legacy))out.add(new Existing("phone","","Phone storage · original database",legacy,StorageFiles.size(new File[]{legacy})));
         for(Choice choice:choices(c)){
-            File parent=new File(choice.root,"teleno-chain");File[] dirs=parent.listFiles();if(dirs==null)continue;
+            File parent=new File(choice.root,"teleno-lite-chain");File[] dirs=parent.listFiles();if(dirs==null)continue;
             for(File f:dirs){
                 String prefix=n+"-";if(!f.getName().matches(java.util.regex.Pattern.quote(prefix)+"[a-f0-9]{32}")||Files.isSymbolicLink(f.toPath()))continue;
                 String gen=f.getName().substring(prefix.length());
@@ -123,7 +123,7 @@ final class NodeStorage {
             if(hasChain(c,n))return false;
             File legacy=slots(c,n)[0];if(Files.isSymbolicLink(legacy.toPath()))return true;
             for(Choice choice:choices(c)){
-                File[] dirs=new File(choice.root,"teleno-chain").listFiles();if(dirs==null)continue;
+                File[] dirs=new File(choice.root,"teleno-lite-chain").listFiles();if(dirs==null)continue;
                 for(File f:dirs)if(f.getName().matches(java.util.regex.Pattern.quote(n+"-")+"[a-f0-9]{32}")&&ChainData.usable(new File(f,"db")))return true;
             }
         }catch(Exception ignored){}return false;

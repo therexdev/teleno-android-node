@@ -64,10 +64,10 @@ public final class MainActivity extends Activity {
         dashboard = new DashboardController(this, () -> { if (!isDestroyed()) refresh(); });
         build(); if(saved!=null) { notificationStart=saved.getParcelable("notification-start"); shell.select(saved.getInt("screen",0),false); shell.setup.post(() -> shell.setup.scrollTo(0,saved.getInt("setup-scroll",0)));if(saved.getBoolean("silent-mode",false))silent.enter(); }
         refresh();
-        work.execute(()->{try{if(!NodeService.isActive())SnapshotBootstrap.finishCompleted(this,network);}catch(Exception ignored){}handler.post(()->{if(!isDestroyed())refresh();});});
+        work.execute(()->{try{if(LitePreview.ready()&&!NodeService.isActive())SnapshotBootstrap.finishCompleted(this,network);}catch(Exception ignored){}handler.post(()->{if(!isDestroyed())refresh();});});
         walletAction("",c->{},false,false);
     }
-    @Override protected void onResume() { super.onResume(); resumed=true;if(NodeService.resumeRequested(this)&&!NodeService.isActive()) {
+    @Override protected void onResume() { super.onResume(); resumed=true;if(LitePreview.ready()&&NodeService.resumeRequested(this)&&!NodeService.isActive()) {
         try {startForegroundService(new Intent(this,NodeService.class).setAction(NodeService.RECOVER));}catch(RuntimeException e){NodeService.saveReason(this,"Open Setup and Start observer to restore the saved node run.");}
     }if(silent!=null)silent.foreground(true); if(shell!=null)shell.foreground(silent==null||!silent.active()); handler.removeCallbacks(tick); handler.post(tick); }
     @Override protected void onPause() { resumed=false; handler.removeCallbacks(tick);if(silent!=null)silent.foreground(false); if(shell!=null)shell.foreground(false); super.onPause(); }
@@ -103,10 +103,10 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.TRANSPARENT);scroll.setVerticalScrollBarEnabled(false);
         content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(18), dp(18), dp(18), dp(28));
         scroll.addView(content);
-        content.addView(text("TELENO  /  GET STARTED", 12, GREEN, true));
-        content.addView(text("Node setup", 30, INK, true));
-        content.addView(text("App " + appVersion() + " · " + (ProductionReview.buildAllowsProduction(engineAvailable, productionQualified, experimentalProduction) ? "Block production available" : "Observer mode"), 14, GREEN, true));
-        content.addView(text("Four steps to start mining. Your saved wallet, chain and signing key are reused.", 15, MUTED, false));
+        content.addView(text("TELENO LITE  /  GET STARTED", 12, GREEN, true));
+        content.addView(text("Teleno Node Lite", 30, INK, true));
+        content.addView(text("App " + appVersion() + " · " + "Lite preview", 14, GREEN, true));
+        content.addView(text("Lite has its own wallet connection, keys and app data. Compact mining is not available in this preview.", 15, MUTED, false));
         LinearLayout status = card(null);
         state = text("Stopped", 25, INK, true); status.addView(state);
         detail = text("", 15, MUTED, false); status.addView(detail);
@@ -117,6 +117,7 @@ public final class MainActivity extends Activity {
         force = button(status, "Force stop…", () -> new AlertDialog.Builder(this).setTitle("Force stop the node?")
             .setMessage("Use this only if shutdown is stuck. The next observer start may need database recovery. Production will remain off.")
             .setNegativeButton("Keep waiting", null).setPositiveButton("Force stop", (d, w) -> send(NodeService.FORCE)).show());
+        content.addView(text(LitePreview.STATUS,14,UiKit.AMBER,true));
         LinearLayout wallet = card("1  ·  Connect wallet");
         wallet.addView(text("Choose your producer wallet in KOIN Vault, approve the connection, and return here.", 14, MUTED, false));
         walletStatus=text("",14,MUTED,false);wallet.addView(walletStatus);
@@ -130,7 +131,7 @@ public final class MainActivity extends Activity {
         walletOptions.addView(text("Vault connections last about 30 minutes. Reconnect only for a new wallet transaction after expiry or disconnection. Mining uses your saved account and signing key and does not need a live Vault connection.",14,MUTED,false));
         accountButton = button(walletOptions, "Use another wallet · enter address manually", this::setAccount);
         LinearLayout burn = card("2  ·  Burn KOIN to VHP");
-        burn.addView(text("Convert KOIN to VHP and optionally approve it for mining in one Vault transaction. Burning is irreversible.",14,MUTED,false));
+        burn.addView(text("Convert KOIN to VHP with Vault approval. Burning is irreversible and does not enable mining in this Lite preview.",14,MUTED,false));
         burnText=text("",14,INK,false);burn.addView(burnText);
         burnButton=button(burn,"Burn KOIN → VHP…",this::loadBurn);burnButton.setTag("burn-koin");
         checkBurn=button(burn,"Check saved KOIN burn",()->walletAction("KOIN burn status",this::checkBurnHistory,false,true));
@@ -146,8 +147,8 @@ public final class MainActivity extends Activity {
         dismissPermission=button(permissionOptions,"Resolve expired permission…",()->new AlertDialog.Builder(this).setTitle("Resolve an expired permission request?")
             .setMessage("Check KOIN Vault's transaction history and pending approvals first. Closing this saved record does not cancel a submitted transaction or revoke an allowance. The transaction might still complete. Nothing will be resent. Check the local allowance before making a new request.")
             .setNegativeButton("Keep request",null).setPositiveButton("I checked the wallet",(d,w)->walletAction("Permission record updated",VaultClient::dismissExpiredAllowance,false,true)).show());
-        LinearLayout sync = card("3  ·  Restore or download chain");
-        sync.addView(text("Reuse an existing chain or download a snapshot. Review the download size before choosing Wi-Fi or mobile data.", 14, MUTED, false));
+        LinearLayout sync = card("3  ·  Compact chain");
+        sync.addView(text("The compact snapshot is still being developed. This preview cannot download the standard node database or access the standard app’s chain data.", 14, MUTED, false));
         snapshotSetupText=text("",14,INK,true);sync.addView(snapshotSetupText);
         snapshotText=text("",14,INK,false);snapshotText.setTextIsSelectable(true);sync.addView(snapshotText);
         snapshotProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);snapshotProgress.setMax(100);sync.addView(snapshotProgress,new LinearLayout.LayoutParams(-1,dp(10)));
@@ -157,15 +158,15 @@ public final class MainActivity extends Activity {
         discardDownload=button(sync,"Discard unfinished download…",()->new AlertDialog.Builder(this).setTitle("Discard the unfinished download?")
             .setMessage("Only the inactive snapshot download will be deleted. The current chain database, wallet connection and signing keys are kept. You can then check for a newer snapshot or start the observer normally.")
             .setNegativeButton("Keep download",null).setPositiveButton("Discard download",(d,w)->{if(!NodeService.isActive())send(NodeService.DISCARD_DOWNLOAD);}).show());
-        sync.addView(text("Progress, speed and errors appear here. Cancel keeps verified files for Resume. Alternatively, use Advanced → Start observer to sync from genesis. Start node in step 4 handles catching up and enabling production automatically.", 14, MUTED, false));
+        sync.addView(text("The Lite compact snapshot and storage requirement will be shown here once validated. The standard app’s chain is kept separate.", 14, MUTED, false));
         LinearLayout produce = card("4  ·  Start node");
-        produce.addView(text("Start here or on Home. Teleno handles signing-key setup, catches up, and enables mining after its checks pass. Charging is optional.", 14, MUTED, false));
+        produce.addView(text("Compact mining is not available yet. Start node shows preview status; it will not start the standard full-storage engine.", 14, MUTED, false));
         productionText = text("", 14, INK, true); produce.addView(productionText);
         production = button(produce, "Start node", this::startNode);
         button(produce,"Production health / copy report",()->{if(shell!=null)shell.showProductionHealth();}).setTag("production-health");
         if (!productionQualified) produce.addView(text(experimentalProduction
             ? "Charging is optional. Keep the phone cool; use Stop node to stop production. Automatic recovery resumes this reviewed producer after fresh observer checks. Stop node cancels recovery."
-            : "This app is observer-only. Install the full Teleno Node app to enable block production.", 14, UiKit.AMBER, true));
+            : LitePreview.EXPLANATION, 14, UiKit.AMBER, true));
         LinearLayout key = card("Signing key details");
         key.addView(text("This is a separate key used by the node to sign blocks. Create one here, or import the existing block-signing WIF from your node. Never enter your wallet recovery phrase.", 14, MUTED, false));
         keyText = text("", 14, INK, true); key.addView(keyText); keyText.setTextIsSelectable(true);
@@ -236,7 +237,7 @@ public final class MainActivity extends Activity {
         engineText.setText(Build.MANUFACTURER + " " + Build.MODEL + " · Android " + Build.VERSION.RELEASE + "\n"
             + String.format(java.util.Locale.ROOT, "%.1f GiB RAM · ", memory.totalMem / 1073741824.0) + freeLabel
             + "\n" + (arm ? "ARM64 is supported by this app." : "This app requires a 64-bit ARM Android installation.")
-            + "\n" + (engineAvailable ? "Node engine installed." : "Node engine missing. Install the full Teleno Node app."));
+            + "\n" + (engineAvailable ? "Node engine installed." : "Compact mining engine not available in this preview."));
         VaultClient.View wallet=walletClient==null?null:walletClient.view();boolean pending=wallet!=null&&wallet.pending;
         boolean savedDownload=SnapshotBootstrap.pending(this,network);
         if(!v.active&&savedDownload)next.setText("Next: resume the saved chain download in step 3, or discard it to use normal observer sync.");
@@ -248,8 +249,10 @@ public final class MainActivity extends Activity {
         downloadChain.setText(setup.label);downloadChain.setEnabled(setup.enabled());
         findChain.setEnabled(!v.active&&!v.busy&&!snapshotBusy&&!findingChain);findChain.setText(findingChain?"Looking for existing chain data…":"Find existing chain data…");
         replaceChain.setVisibility(existingChain?View.VISIBLE:View.GONE);replaceChain.setEnabled(!v.busy&&!snapshotBusy&&!findingChain);
-        snapshotSetupText.setText("Network: "+label()+"\n"+setup.note);
-        discardDownload.setVisibility(savedDownload?View.VISIBLE:View.GONE);discardDownload.setEnabled(!v.active&&!v.busy&&!snapshotBusy);
+        snapshotSetupText.setText("Network: "+label()+"\nCompact snapshot not available in this preview.");
+        downloadChain.setText("Compact snapshot not available yet");
+        findChain.setVisibility(View.GONE);replaceChain.setVisibility(View.GONE);
+        discardDownload.setVisibility(LitePreview.ready()&&savedDownload?View.VISIBLE:View.GONE);discardDownload.setEnabled(!v.active&&!v.busy&&!snapshotBusy);
         boolean liveDownload=v.downloading&&network.equals(v.network);
         String downloadNote=getSharedPreferences("settings",MODE_PRIVATE).getString("snapshot-status-"+network,"");
         snapshotText.setText(liveDownload?v.phase+"\n"+v.detail:downloadNote);
@@ -287,9 +290,10 @@ public final class MainActivity extends Activity {
             ?permissionSnapshot.status():"No chain download is needed to burn or check VHP permission.";
         if(pendingPermission)permissionNote+="\n\nSaved permission request: "+WalletReader.amount(wallet.amount)+" VHP. "+wallet.note+(wallet.txid.isEmpty()?"":"\nTransaction: "+wallet.txid);
         permissionText.setText(permissionBusy?"Checking the VHP balance and PoB allowance…":permissionNote);
-        productionText.setText(productionSetup(v).note + productionProblem(v));
+        productionText.setText(LitePreview.STATUS);
         recent.setText(v.events.isEmpty() ? "No node events yet. Progress and next steps appear above." : android.text.TextUtils.join("\n\n", v.events));
         dashboard.select(network,account);dashboard.run(v);if(resumed)dashboard.tick();
+        state.setText("Lite preview");detail.setText(LitePreview.EXPLANATION);next.setText(LitePreview.STATUS);
         shell.bind(v,dashboard,!v.busy&&!keyBusy&&!snapshotBusy,stop.isEnabled(),network,account,exists,free,appVersion());
         silent.view.bind(v,dashboard);
         if(wallet!=null&&(wallet.pairing||wallet.connected)&&System.currentTimeMillis()-lastWalletPoll>6000&&!walletBusy.get()) {
@@ -317,6 +321,7 @@ public final class MainActivity extends Activity {
     }
     private void reviewSnapshot(){reviewSnapshot(false);}
     private void reviewSnapshot(boolean replace) {
+        if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
         long availableBytes=-1;String storageProblem="";
         try{availableBytes=NodeStorage.free(this,network);}catch(Exception e){storageProblem=e.getMessage();}
         SnapshotSetup setup=snapshotSetup(NodeService.snapshot(),availableBytes,storageProblem);
@@ -375,6 +380,7 @@ public final class MainActivity extends Activity {
             .setPositiveButton("Download using mobile data",(d,w)->approved.run()).show();
     }
     private void findExistingChain() {
+        if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
         if(NodeService.isActive()||findingChain)return;final String chosen=network;findingChain=true;refresh();
         work.execute(()->{try {
             java.util.List<NodeStorage.Existing> found=NodeStorage.findExisting(this,chosen);
@@ -414,6 +420,7 @@ public final class MainActivity extends Activity {
         .setMessage("This cleanup is OPTIONAL. It is never required to start your existing node. The observer has advanced on the selected storage. This permanently removes only the retained previous backup; the current chain, wallet connection and signing keys are kept.")
         .setNegativeButton("Keep copy",null).setPositiveButton("Delete backup",(d,w)->{if(!NodeService.isActive())send(NodeService.CLEAN_STORAGE);}).show();}
     private void runNode(String action) {
+        if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 10); return;
         }
@@ -684,6 +691,7 @@ public final class MainActivity extends Activity {
         reader.verify();return java.security.MessageDigest.isEqual(key,registered);
     }
     private void startNode() {
+        if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
         NodeService.ViewState node=NodeService.snapshot();
         if(node.busy||keyBusy||snapshotBusy||permissionBusy||burnBusy){message("Starting node","Wait for the current operation to finish. No second start was sent.");return;}
         if(NodeService.PRODUCER.equals(node.mode)&&node.active)return;
@@ -725,6 +733,7 @@ public final class MainActivity extends Activity {
         }catch(Exception|LinkageError e){handler.post(()->{keyBusy=false;if(!isDestroyed()){refresh();message("Signing key unavailable",e.getMessage());}});}});
     }
     private void submitNodeStart(String chosen,String account,byte[] publicKey){
+        if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
         if(!chosen.equals(network)||!account.equals(getSharedPreferences("settings",MODE_PRIVATE).getString("producer-"+chosen,""))){message("Start again","The selected network or producer changed.");return;}
         Intent intent=new Intent(this,NodeService.class).setAction(NodeService.PRODUCER).putExtra("network",chosen)
             .putExtra(NodeService.REVIEWED,true).putExtra(NodeService.REVIEW_ACCOUNT,account).putExtra(NodeService.REVIEW_KEY,publicKey);
@@ -736,6 +745,7 @@ public final class MainActivity extends Activity {
         }else startForegroundService(intent);
     }
     private void reviewProduction() {
+        if(!LitePreview.ready()){message("Teleno Node Lite",LitePreview.EXPLANATION);return;}
         NodeService.ViewState current = NodeService.snapshot();
         ProductionSetup setup = productionSetup(current);
         if (setup.action != ProductionSetup.Action.REVIEW) { explainProduction(setup, current); return; }

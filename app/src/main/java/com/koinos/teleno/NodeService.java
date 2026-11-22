@@ -22,13 +22,13 @@ public final class NodeService extends Service {
     static final String MOVE_STORAGE = "move-storage", CLEAN_STORAGE = "clean-storage";
     static final String DOWNLOAD_CHAIN="download-chain", DISCARD_DOWNLOAD="discard-download";
     static final String REVIEWED="production-reviewed", REVIEW_ACCOUNT="reviewed-account", REVIEW_KEY="reviewed-public-key";
-    private static final String CHANNEL = "local-node";
+    private static final String CHANNEL = "teleno-lite-node";
     private static final int NOTICE = 100;
     private static final Pattern PEERS = Pattern.compile("\\bpeer_count=(\\d+)");
     private static final Object LOCK = new Object();
     private static volatile NodeService instance;
     static final class ViewState {
-        String phase = "Stopped", detail = "Start an observer to validate and sync the chain.", mode = "stopped", network = "harbinger";
+        String phase = "Lite preview", detail = LitePreview.EXPLANATION, mode = "stopped", network = "harbinger";
         long height, lib, freeBytes, headTime, sampleAt, localBlocks, runStartedAt, runEndedAt; boolean producerRunning; int peers = -1;
         ProductionStatus.Snapshot production = new ProductionStatus().snapshot();
         String producerAccount="",runNetwork="",runAccount="";
@@ -164,16 +164,21 @@ public final class NodeService extends Service {
     @Override public void onCreate() {
         super.onCreate(); instance = this;
         NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Local Teleno node", NotificationManager.IMPORTANCE_LOW));
-        wake = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "teleno:node"); wake.setReferenceCounted(false);
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Teleno Node Lite", NotificationManager.IMPORTANCE_LOW));
+        wake = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "teleno-lite:node"); wake.setReferenceCounted(false);
         try {
             android.net.wifi.WifiManager wm=(android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
-            if(wm!=null){wifi=wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,"teleno:network");wifi.setReferenceCounted(false);}
+            if(wm!=null){wifi=wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,"teleno-lite:network");wifi.setReferenceCounted(false);}
         }catch(RuntimeException ignored){/* CPU lock and recovery remain available on non-Wi-Fi devices. */}
         monitor.scheduleWithFixedDelay(this::monitorTick, 2, 5, TimeUnit.SECONDS);
     }
     @Override public android.os.IBinder onBind(Intent intent) { return null; }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        if(!LitePreview.ready()&&LitePreview.blocks(intent==null?null:intent.getAction())){
+            forgetRun();
+            synchronized(LOCK){VIEW.active=false;VIEW.busy=false;VIEW.ready=false;VIEW.mode="stopped";VIEW.phase="Lite preview";VIEW.detail=LitePreview.EXPLANATION;}
+            stopSelf();return START_NOT_STICKY;
+        }
         if(intent==null||intent.getAction()==null||RECOVER.equals(intent.getAction())) {
             if(wanted)return START_STICKY;
             try {restoreRun();}
@@ -593,7 +598,7 @@ public final class NodeService extends Service {
     private Notification notification(String text) {
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent stop = PendingIntent.getService(this, 1, new Intent(this, NodeService.class).setAction(STOP), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_node).setContentTitle("Teleno · " + network).setContentText(text)
+        return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_node_lite).setContentTitle("Teleno Lite · " + network).setContentText(text)
             .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).addAction(new Notification.Action.Builder(null, "Stop node", stop).build()).build();
     }
     private void notifyStatus(String text) { if (instance == this) getSystemService(NotificationManager.class).notify(NOTICE, notification(text)); }

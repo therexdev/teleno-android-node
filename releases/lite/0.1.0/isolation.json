@@ -1,0 +1,12 @@
+{
+  "package": "com.koinos.teleno.lite",
+  "standard_package": "com.koinos.teleno",
+  "lite_ports": {
+    "RPC_PORT": 28085,
+    "P2P_PORT": 28888
+  },
+  "separate_identity": true,
+  "standard_engine_bundled": false,
+  "compact_mining_ready": false,
+  "device_installation_tested": false
+}

@@ -4,5 +4,7 @@
   "experimentalProductionEnabled": false,
   "abi": "arm64-v8a",
   "sourceCommit": "2c11229267cff2f9ee39ed8e56ab70af391d85ce",
-  "reason": "The node engine is not included. Build or install the full Teleno Node app."
+  "reason": "Lite preview: compact mining is not available yet.",
+  "liteStorageReady": false,
+  "applicationId": "com.koinos.teleno.lite"
 }

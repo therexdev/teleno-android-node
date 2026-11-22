@@ -13,7 +13,7 @@ import javax.crypto.spec.GCMParameterSpec;
 
 /** Pairing credentials remain encrypted in no-backup phone storage, including on SD setups. */
 final class VaultStore implements VaultClient.Store {
-    private static final String ALIAS="teleno-koin-vault-session-v1";
+    private static final String ALIAS="teleno-lite-koin-vault-session-v1";
     private final File file;
     VaultStore(Context c){file=new File(c.getNoBackupFilesDir(),"koin-vault-session.gcm");}
     private SecretKey key(boolean create) throws Exception {
